@@ -1,0 +1,31 @@
+/* src/styles/variables.css */
+:root {
+    /* 1. 基础修复：补全 reset.css 报错需要的变量 */
+    --font-family: "Inter", "system-ui", "Microsoft YaHei", sans-serif;
+    --bg-secondary: #030712;
+
+    /* 2. 核心色调：强制深色 */
+    --bg-main: #030712;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+
+    /* 3. 玻璃拟态相关 */
+    --surface-color: rgba(17, 24, 39, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-blur: blur(16px);
+    --glass-reflect: rgba(255, 255, 255, 0.05);
+    --accent-glow: rgba(99, 102, 241, 0.15);
+    --crystal-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+
+    /* 4. 其它布局变量保持原样... */
+    --header-height: 64px;
+    /* ========== 基础修复 (解决 reset.css 报错) ========== */
+
+    /* ========== 核心品牌色 ========== */
+    --primary-color: #6366f1;
+    --secondary-color: #ec4899;
+    --accent-color: #06b6d4;
+    --error-color: #ef4444;
+    --radius-main: 16px;
+    --transition-base: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}

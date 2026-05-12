@@ -1,0 +1,26 @@
+/* src/styles/common.css */
+
+#app {
+    min-height: 100vh;
+    width: 100%;
+    background-color: var(--bg-main);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 消除所有侧边栏和主内容的缝隙 */
+.layout-container, .main-wrapper {
+    display: flex;
+    flex: 1;
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 玻璃拟态卡片全局样式 */
+.glass-card {
+    background: var(--surface-color);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-main);
+}

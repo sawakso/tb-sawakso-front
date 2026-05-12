@@ -1,0 +1,24 @@
+/* src/styles/reset.css */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden; /* 防止横向出现白边 */
+}
+
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-main); /* 使用黑色变量 */
+    color: var(--text-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+ul, ol { list-style: none; }
+a { text-decoration: none; color: inherit; }
+button { border: none; background: none; cursor: pointer; }
