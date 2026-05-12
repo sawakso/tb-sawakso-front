@@ -16,6 +16,11 @@ const routes = [
         path: '/bar/:id',
         name: 'barDetail',
         component: () => import('@/views/BarDetail/BarDetail.vue')
+    },
+    {
+        path: '/profile',
+        name: 'profile',
+        component: () => import('@/views/Profile/Profile.vue')
     }
 ]
 
