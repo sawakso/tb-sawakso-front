@@ -38,18 +38,23 @@
           </button>
         </div>
 
-        <!-- 媒体内容 -->
-        <div class="post-media" v-if="post.media_type">
-          <img
-              v-if="post.media_type === 'image'"
-              :src="post.media_url"
-              :alt="post.title"
-              class="media-full"
-              @error="e => e.target.style.display = 'none'"
-          />
+        <!-- 媒体内容（支持多图+视频） -->
+        <div class="post-media" v-if="hasMedia">
+          <!-- 多图平铺 -->
+          <template v-if="mediaImages.length > 0">
+            <img
+                v-for="(url, idx) in mediaImages"
+                :key="'img-' + idx"
+                :src="url"
+                :alt="post.title + ' 图' + (idx + 1)"
+                class="media-full media-image-item"
+                @error="e => e.target.style.display = 'none'"
+            />
+          </template>
+          <!-- 视频 -->
           <video
-              v-else-if="post.media_type === 'video'"
-              :src="post.media_url"
+              v-if="mediaVideo"
+              :src="mediaVideo"
               controls
               class="media-full"
           ></video>
@@ -164,6 +169,34 @@ const barName = computed(() => {
   const b = allBars.value.find(b => b.id === post.value?.bar_id)
   return b?.name || ''
 })
+
+// ====== 多图/视频 URL 解析 ======
+// media_url 新格式: "url1,url2,url3" (纯图片) 或 "url1,url2,url3|videoUrl" (图+视频)
+const parsedMedia = computed(() => {
+  if (!post.value?.media_url) return { images: [], video: null }
+  const url = post.value.media_url
+
+  // 含 | 表示有视频
+  if (url.includes('|')) {
+    const parts = url.split('|')
+    return {
+      images: parts[0] ? parts[0].split(',').filter(Boolean) : [],
+      video: parts[1] || null
+    }
+  }
+  // 纯逗号分隔 = 多图
+  if (url.includes(',')) {
+    return { images: url.split(',').filter(Boolean), video: null }
+  }
+  // 单 URL（旧格式）
+  return { images: [url], video: null }
+})
+
+const mediaImages = computed(() => parsedMedia.value.images)
+const mediaVideo = computed(() => parsedMedia.value.video)
+const hasMedia = computed(() =>
+  post.value?.media_type && (mediaImages.value.length > 0 || mediaVideo.value)
+)
 
 const timeAgo = computed(() => {
   if (!post.value) return ''
@@ -287,10 +320,13 @@ const handleLike = async () => {
   max-height: 400px;
   object-fit: contain;
   border-radius: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   background: #1a1a2e;
   display: block;
   min-height: 200px;
+}
+.media-image-item {
+  max-height: 350px;
 }
 
 .post-content {

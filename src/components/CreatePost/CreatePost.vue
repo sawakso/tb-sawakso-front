@@ -35,39 +35,73 @@
               v-model="form.content"
               class="form-textarea"
               placeholder="支持 Markdown：**粗体**、### 标题、```代码块```"
-              rows="8"
+              rows="6"
               maxlength="5000"
           ></textarea>
           <span class="char-count">{{ form.content.length }} / 5000</span>
         </div>
 
-        <!-- 媒体 URL（可选） -->
-        <div class="form-group">
-          <label>媒体链接（可选）</label>
-          <input
-              v-model="form.media_url"
-              type="text"
-              class="form-input"
-              placeholder="图片或视频 URL，留空则不添加"
-          />
-        </div>
+        <!-- 媒体上传区域 -->
+        <div class="media-upload-section">
+          <div class="media-upload-header">
+            <button
+                class="upload-btn"
+                :disabled="images.length >= 3"
+                @click="triggerImageInput"
+            >
+              <i class="fas fa-image"></i> 添加图片{{ images.length > 0 ? `(${images.length}/3)` : '' }}
+            </button>
+            <button
+                class="upload-btn video-btn"
+                :disabled="!!videoFile"
+                @click="triggerVideoInput"
+            >
+              <i class="fas fa-video"></i> {{ videoFile ? '已添加视频' : '添加视频' }}
+            </button>
+            <span class="upload-hint">图片最多 3 张（单张 ≤5MB），视频 1 个（≤50MB）</span>
+          </div>
 
-        <!-- 媒体类型 -->
-        <div class="form-group" v-if="form.media_url">
-          <label>媒体类型</label>
-          <div class="media-type-options">
-            <label class="radio-label">
-              <input type="radio" v-model="form.media_type" value="image" />
-              <span>图片</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" v-model="form.media_type" value="video" />
-              <span>视频</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" v-model="form.media_type" value="link" />
-              <span>链接</span>
-            </label>
+          <!-- 隐藏的文件输入框 -->
+          <input
+              ref="imageInputRef"
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              @change="handleImageSelect"
+          />
+          <input
+              ref="videoInputRef"
+              type="file"
+              accept="video/*"
+              hidden
+              @change="handleVideoSelect"
+          />
+
+          <!-- 图片预览区 -->
+          <div class="preview-grid" v-if="images.length > 0">
+            <div v-for="(img, index) in images" :key="index" class="preview-item">
+              <img :src="img.preview" :alt="'图片' + (index + 1)" />
+              <button class="remove-btn" @click="removeImage(index)" title="删除">&times;</button>
+            </div>
+            <!-- 添加更多位 -->
+            <div
+                v-if="images.length < 3"
+                class="preview-item add-more"
+                @click="triggerImageInput"
+            >
+              <i class="fas fa-plus"></i>
+            </div>
+          </div>
+
+          <!-- 视频预览 -->
+          <div class="video-preview" v-if="videoFile">
+            <video :src="videoPreview" preload="metadata"></video>
+            <div class="video-info">
+              <span><i class="fas fa-film"></i> {{ videoFile.name }}</span>
+              <span class="video-size">{{ formatSize(videoFile.size) }}</span>
+            </div>
+            <button class="remove-btn video-remove" @click="removeVideo" title="删除">&times;</button>
           </div>
         </div>
 
@@ -88,7 +122,13 @@
             :disabled="!canSubmit || submitting"
             @click="handleSubmit"
         >
-          {{ submitting ? '发布中...' : '发布' }}
+          <template v-if="uploading">
+            <i class="fas fa-spinner fa-spin"></i> 上传中...
+          </template>
+          <template v-else-if="submitting">
+            发布中...
+          </template>
+          <template v-else>发布</template>
         </button>
       </div>
     </div>
@@ -100,6 +140,7 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { postsApi } from '@/request/api/posts.js'
 import { barsApi } from '@/request/api/bars.js'
+import request from '@/request/index'
 
 const props = defineProps({
   visible: Boolean,
@@ -110,15 +151,24 @@ const emit = defineEmits(['close', 'created'])
 
 const router = useRouter()
 const submitting = ref(false)
+const uploading = ref(false)
 const bars = ref([])
 
+// 表单数据
 const form = ref({
   title: '',
   content: '',
-  bar_id: props.defaultBarId || '',
-  media_type: 'image',
-  media_url: ''
+  bar_id: props.defaultBarId || ''
 })
+
+// 媒体文件状态
+const images = ref([])       // [{ file: File, preview: string }]
+const videoFile = ref(null)   // File | null
+const videoPreview = ref('')  // blob URL
+
+// 文件输入框引用
+const imageInputRef = ref(null)
+const videoInputRef = ref(null)
 
 // 加载贴吧列表
 watch(() => props.visible, async (val) => {
@@ -134,6 +184,82 @@ const canSubmit = computed(() => {
   return form.value.title.trim() && form.value.content.trim() && form.value.bar_id
 })
 
+// ========== 媒体处理 ==========
+
+// 触发图片选择
+const triggerImageInput = () => {
+  imageInputRef.value?.click()
+}
+
+// 触发视频选择
+const triggerVideoInput = () => {
+  if (videoFile.value) return // 已有视频
+  videoInputRef.value?.click()
+}
+
+// 处理图片选择
+const handleImageSelect = (e) => {
+  const files = Array.from(e.target.files || [])
+  const remaining = 3 - images.value.length
+
+  if (files.length > remaining) {
+    alert(`最多还能添加 ${remaining} 张图片`)
+  }
+
+  for (let i = 0; i < Math.min(files.length, remaining); i++) {
+    const file = files[i]
+    // 校验大小：5MB
+    if (file.size > 5 * 1024 * 1024) {
+      alert(`图片 "${file.name}" 超过 5MB 限制`)
+      continue
+    }
+    images.value.push({
+      file,
+      preview: URL.createObjectURL(file)
+    })
+  }
+
+  // 清空 input 以便重复选择同一文件
+  e.target.value = ''
+}
+
+// 处理视频选择
+const handleVideoSelect = (e) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+
+  if (file.size > 50 * 1024 * 1024) {
+    alert('视频不能超过 50MB')
+    e.target.value = ''
+    return
+  }
+
+  videoFile.value = file
+  videoPreview.value = URL.createObjectURL(file)
+  e.target.value = ''
+}
+
+// 删除某张图片
+const removeImage = (index) => {
+  URL.revokeObjectURL(images.value[index].preview)
+  images.value.splice(index, 1)
+}
+
+// 删除视频
+const removeVideo = () => {
+  URL.revokeObjectURL(videoPreview.value)
+  videoFile.value = null
+  videoPreview.value = ''
+}
+
+// 格式化文件大小
+const formatSize = (bytes) => {
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+// ========== Markdown 预览 ==========
+
 const renderPreview = computed(() => {
   if (!form.value.content) return ''
   return form.value.content
@@ -144,8 +270,17 @@ const renderPreview = computed(() => {
       .replace(/\n/g, '<br>')
 })
 
+// ========== 提交 ==========
+
 const close = () => {
-  form.value = { title: '', content: '', bar_id: '', media_type: 'image', media_url: '' }
+  // 释放所有预览 URL
+  images.value.forEach(img => URL.revokeObjectURL(img.preview))
+  if (videoPreview.value) URL.revokeObjectURL(videoPreview.value)
+
+  form.value = { title: '', content: '', bar_id: '' }
+  images.value = []
+  videoFile.value = null
+  videoPreview.value = ''
   emit('close')
 }
 
@@ -153,18 +288,50 @@ const handleSubmit = async () => {
   if (!canSubmit.value || submitting.value) return
 
   submitting.value = true
+
   try {
-    const payload = {
+    let payload = {
       title: form.value.title.trim(),
       content: form.value.content.trim(),
       bar_id: Number(form.value.bar_id)
     }
-    // 只有填写了媒体 URL 才带上媒体字段
-    if (form.value.media_url?.trim()) {
-      payload.media_type = form.value.media_type
-      payload.media_url = form.value.media_url.trim()
+
+    // ===== 先并行上传媒体到 R2 =====
+    const uploadTasks = []
+
+    for (const img of images.value) {
+      uploadTasks.push(postsApi.uploadMedia(img.file))
+    }
+    if (videoFile.value) {
+      uploadTasks.push(postsApi.uploadMedia(videoFile.value))
     }
 
+    let uploadResults = []
+    if (uploadTasks.length > 0) {
+      uploading.value = true
+      try {
+        uploadResults = await Promise.all(uploadTasks)
+      } catch (e) {
+        console.error('媒体上传失败:', e)
+        alert('媒体上传失败，请检查网络后重试')
+        return
+      } finally {
+        uploading.value = false
+      }
+    }
+
+    // ===== 组装媒体字段 =====
+    const imageResults = uploadResults.filter(r => r.data?.type === 'image')
+    const videoResult = uploadResults.find(r => r.data?.type === 'video')
+
+    if (imageResults.length > 0) {
+      payload.images = JSON.stringify(imageResults.map(r => r.data.url))
+    }
+    if (videoResult) {
+      payload.video = videoResult.data.url
+    }
+
+    // 发送创建请求
     const res = await postsApi.create(payload)
 
     // 清除帖子列表缓存
@@ -172,7 +339,6 @@ const handleSubmit = async () => {
 
     emit('created', res.data)
 
-    // 跳转到新帖子详情
     close()
     await router.push(`/post/${res.data.id}`)
   } catch (e) {
@@ -199,9 +365,9 @@ const handleSubmit = async () => {
   background: var(--surface-color);
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  width: 620px;
-  max-width: 90vw;
-  max-height: 85vh;
+  width: 640px;
+  max-width: 92vw;
+  max-height: 88vh;
   overflow-y: auto;
 }
 .modal-header {
@@ -220,7 +386,7 @@ const handleSubmit = async () => {
 
 .modal-body { padding: 24px; }
 
-.form-group { margin-bottom: 18px; }
+.form-group { margin-bottom: 16px; }
 .form-group label {
   display: block; font-size: 0.88rem; font-weight: 500;
   color: var(--text-secondary); margin-bottom: 6px;
@@ -236,7 +402,7 @@ const handleSubmit = async () => {
   border-color: var(--primary-color);
 }
 .form-textarea {
-  resize: vertical; min-height: 120px; line-height: 1.6;
+  resize: vertical; min-height: 80px; line-height: 1.6;
   font-family: inherit;
 }
 .char-count {
@@ -245,15 +411,137 @@ const handleSubmit = async () => {
   margin-top: 4px;
 }
 
-.media-type-options {
-  display: flex; gap: 16px;
+/* ====== 媒体上传区域 ====== */
+.media-upload-section {
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--bg-color);
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
 }
-.radio-label {
-  display: flex; align-items: center; gap: 6px;
-  cursor: pointer; font-size: 0.88rem; color: var(--text-color);
+.media-upload-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
-.radio-label input[type="radio"] { accent-color: var(--primary-color); }
+.upload-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border: 1px solid var(--primary-color);
+  border-radius: 18px; background: rgba(94, 129, 255, 0.06);
+  color: var(--primary-color); cursor: pointer;
+  font-size: 0.85rem; transition: all 0.2s;
+}
+.upload-btn:hover:not(:disabled) {
+  background: var(--primary-color); color: #fff;
+}
+.upload-btn:disabled {
+  opacity: 0.45; cursor: not-allowed;
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+  background: transparent;
+}
+.video-btn {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.06);
+}
+.video-btn:hover:not(:disabled) {
+  background: #8b5cf6; color: #fff;
+}
+.upload-hint {
+  font-size: 0.75rem; color: var(--text-secondary);
+  margin-left: auto;
+}
 
+/* 图片预览网格 */
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.preview-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+.preview-item img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.preview-item.add-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-color);
+  cursor: pointer;
+  border-style: dashed;
+  transition: border-color 0.2s;
+}
+.preview-item.add-more:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+.preview-item.add-more i {
+  font-size: 1.4rem;
+  color: var(--text-secondary);
+}
+.remove-btn {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff; border: none;
+  font-size: 0.85rem; cursor: pointer;
+  display: flex; align-items: center;
+  justify-content: center;
+  line-height: 1;
+  z-index: 2;
+  transition: background 0.15s;
+}
+.remove-btn:hover {
+  background: #ef4444;
+}
+
+/* 视频预览 */
+.video-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.video-preview video {
+  width: 120px; height: 68px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #000;
+}
+.video-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+  color: var(--text-color);
+}
+.video-info i { color: #8b5cf6; margin-right: 4px; }
+.video-size {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.video-remove {
+  top: auto; right: 12px;
+}
+
+/* 预览区域 */
 .preview-section { margin-top: 8px; }
 .preview-section h4 {
   font-size: 0.85rem; color: var(--text-secondary);
@@ -287,10 +575,17 @@ const handleSubmit = async () => {
 }
 .btn-cancel:hover { border-color: var(--text-color); color: var(--text-color); }
 .btn-submit {
+  display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 28px; border: none; border-radius: 20px;
   background: var(--primary-color); color: white; cursor: pointer;
   font-size: 0.9rem; font-weight: 500; transition: all 0.2s;
 }
 .btn-submit:hover:not(:disabled) { background: var(--secondary-color); }
 .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 动画 */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.fa-spin { animation: spin 1s linear infinite; }
 </style>

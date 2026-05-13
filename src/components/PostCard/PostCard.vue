@@ -9,12 +9,12 @@
     <div class="post-body">
       <h3 class="post-title">{{ post.title }}</h3>
 
-      <div class="post-media" v-if="post.media_type">
-        <div v-if="post.media_type === 'image'" class="media-image" :style="{ aspectRatio: mediaRatio }">
-          <img :src="post.media_url" :alt="post.title" @error="handleImgError" />
+      <div class="post-media" v-if="firstMediaUrl">
+        <div v-if="isMediaType('image')" class="media-image" :style="{ aspectRatio: mediaRatio }">
+          <img :src="firstMediaUrl" :alt="post.title" @error="handleImgError" />
         </div>
-        <div v-else-if="post.media_type === 'video'" class="media-video" :style="{ aspectRatio: mediaRatio }">
-          <video :src="post.media_url" muted preload="metadata"></video>
+        <div v-else-if="isMediaType('video')" class="media-video" :style="{ aspectRatio: mediaRatio }">
+          <video :src="firstVideoUrl || firstMediaUrl" muted preload="metadata"></video>
           <div class="video-play"><i class="fas fa-play-circle"></i></div>
         </div>
         <div v-else-if="post.media_type === 'link'" class="media-link">
@@ -62,6 +62,52 @@ const excerpt = computed(() => {
 const barName = computed(() => {
   return props.post.bar_name || '未知贴吧'
 })
+
+// ====== 多图/视频 URL 解析 ======
+// media_url 新格式: "url1,url2,url3" (纯图片) 或 "url1,url2,url3|videoUrl" (图+视频)
+// 旧格式: "single_url"
+const parsedMedia = computed(() => {
+  const url = props.post.media_url
+  if (!url) return { images: [], video: null }
+
+  // 新格式：包含 | 分隔符表示有视频
+  if (url.includes('|')) {
+    const parts = url.split('|')
+    const imagePart = parts[0]
+    const videoPart = parts[1]
+    return {
+      images: imagePart ? imagePart.split(',').filter(Boolean) : [],
+      video: videoPart || null
+    }
+  }
+
+  // 逗号分隔的多图（新格式纯图片）
+  if (url.includes(',')) {
+    return { images: url.split(',').filter(Boolean), video: null }
+  }
+
+  // 旧格式单 URL
+  return { images: [url], video: null }
+})
+
+const firstMediaUrl = computed(() => {
+  return parsedMedia.value.images[0] || parsedMedia.value.video || ''
+})
+
+const firstVideoUrl = computed(() => {
+  return parsedMedia.value.video || null
+})
+
+// 判断当前展示的主要媒体类型
+const isMediaType = (type) => {
+  if (type === 'video') {
+    return props.post.media_type === 'video' && !!parsedMedia.value.video
+  }
+  if (type === 'image') {
+    return props.post.media_type === 'image' && parsedMedia.value.images.length > 0
+  }
+  return false
+}
 
 const mediaRatio = computed(() => {
   const w = props.post.media_width
