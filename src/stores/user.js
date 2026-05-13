@@ -3,7 +3,13 @@ import { defineStore } from 'pinia'
 export const useUserStore = defineStore('user', {
     state: () => ({
         token: localStorage.getItem('token') || '',
-        userInfo: null
+        userInfo: (() => {
+            try {
+                return JSON.parse(localStorage.getItem('user') || 'null')
+            } catch {
+                return null
+            }
+        })()
     }),
 
     getters: {
@@ -11,18 +17,19 @@ export const useUserStore = defineStore('user', {
     },
 
     actions: {
+        // 应用启动时调用，从 localStorage 恢复状态（state 初始化已处理，此处作兜底）
         initUser() {
-            const savedUser = localStorage.getItem('user')
-            if (savedUser) {
+            if (!this.userInfo) {
                 try {
-                    this.userInfo = JSON.parse(savedUser)
-                } catch (e) {
+                    const saved = localStorage.getItem('user')
+                    if (saved) this.userInfo = JSON.parse(saved)
+                } catch {
                     localStorage.removeItem('user')
                 }
             }
-            const token = localStorage.getItem('token')
-            if (token) {
-                this.token = token
+            if (!this.token) {
+                const token = localStorage.getItem('token')
+                if (token) this.token = token
             }
         },
 
@@ -34,6 +41,12 @@ export const useUserStore = defineStore('user', {
         setUserInfo(info) {
             this.userInfo = info
             localStorage.setItem('user', JSON.stringify(info))
+        },
+
+        // 局部更新用户信息（如修改头像/昵称后）
+        updateUserInfo(patch) {
+            this.userInfo = { ...this.userInfo, ...patch }
+            localStorage.setItem('user', JSON.stringify(this.userInfo))
         },
 
         logout() {

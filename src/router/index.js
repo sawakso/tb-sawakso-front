@@ -20,13 +20,22 @@ const routes = [
     {
         path: '/profile',
         name: 'profile',
-        component: () => import('@/views/Profile/Profile.vue')
+        component: () => import('@/views/Profile/Profile.vue'),
+        meta: { requiresAuth: true }
     }
 ]
 
 const router = createRouter({
     history: createWebHistory(),
     routes
+})
+
+// 登录守卫：需要登录的页面统一在这里拦截
+router.beforeEach((to) => {
+    if (to.meta.requiresAuth) {
+        const token = localStorage.getItem('token')
+        if (!token) return { path: '/' }
+    }
 })
 
 export default router

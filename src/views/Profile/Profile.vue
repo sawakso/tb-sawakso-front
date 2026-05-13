@@ -87,8 +87,8 @@
       <div v-if="tab === 'following'" class="tab-content">
         <div v-for="u in followingList" :key="u.id" class="user-row">
           <img :src="u.avatar || '/images/default-avatar.png'" class="user-row-avatar" />
-          <span class="user-row-name">{{ u.username }}</span>
-          <button class="unfollow-btn">取消关注</button>
+          <span class="user-row-name">{{ u.nickname || u.username }}</span>
+          <button class="unfollow-btn" @click="handleUnfollowUser(u)">取消关注</button>
         </div>
         <p v-if="followingList.length === 0" class="empty">还没关注任何人</p>
       </div>
@@ -139,6 +139,8 @@ const likedPosts = ref([])
 const likedComments = ref([])
 const allPosts = ref([])
 const followStats = ref({ following: 0, followers: 0 })
+const followingList = ref([])
+const followerList = ref([])
 
 const fetchProfile = async () => {
   const data = await userApi.getMe()
@@ -168,9 +170,21 @@ const getPostTitle = (postId) => {
   return p?.title || '未知帖子'
 }
 
+// 取关用户
+const handleUnfollowUser = async (targetUser) => {
+  try {
+    await userApi.unfollowUser(targetUser.id || targetUser.userId)
+    followingList.value = followingList.value.filter(u =>
+        (u.id || u.userId) !== (targetUser.id || targetUser.userId)
+    )
+    followStats.value.following = Math.max(followStats.value.following - 1, 0)
+  } catch (e) {
+    console.error('取关失败:', e)
+  }
+}
+
 onMounted(async () => {
   showEdit.value = false
-  if (!user.value) { router.push('/'); return }
 
   await fetchProfile()
   await fetchFollowStats()
@@ -190,7 +204,12 @@ onMounted(async () => {
   likedComments.value = myComments.value.filter(c => c.like_count > 0)
 
   const allBars = await barsApi.getAll()
-  myBars.value = allBars.slice(0, 4)
+  myBars.value = await userApi.getMyBars()
+
+  // 获取关注/粉丝列表（目前后端没有列表接口，先用空数组占位）
+  // TODO: 后续可添加 GET /api/user/following 和 GET /api/user/followers 接口
+  followingList.value = []
+  followerList.value = []
 
   await nextTick()
 })

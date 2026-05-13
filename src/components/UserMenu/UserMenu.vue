@@ -86,11 +86,13 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userApi } from '@/request/api/user'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps({ user: Object })
 const emit = defineEmits(['logout'])
 
 const router = useRouter()
+const userStore = useUserStore()
 const showMenu = ref(false)
 
 const goTo = (path) => { router.push(path); showMenu.value = false }
@@ -99,10 +101,10 @@ const goTo = (path) => { router.push(path); showMenu.value = false }
 const showLogoutModal = ref(false)
 const logout = () => { showMenu.value = false; showLogoutModal.value = true }
 const doLogout = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
+  userStore.logout()
   emit('logout')
-  window.location.reload()
+  showLogoutModal.value = false
+  router.push('/')
 }
 
 // 注销账号
@@ -140,8 +142,8 @@ const doDelete = async () => {
     const data = await res.json()
     if (data.code === 200) {
       alert('账号已注销')
-      localStorage.clear()
-      window.location.href = '/'
+      userStore.logout()
+      router.push('/')
     } else {
       alert(data.message || '注销失败')
     }

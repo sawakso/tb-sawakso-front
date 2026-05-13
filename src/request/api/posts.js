@@ -6,5 +6,11 @@ export const postsApi = {
     },
     getById(id) {
         return request.get(`/posts/${id}`)
+    },
+    create(data) {
+        return request.post('/posts', data)
+    },
+    delete(id) {
+        return request.delete(`/posts/${id}`)
     }
 }

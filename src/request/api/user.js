@@ -28,12 +28,20 @@ export const userApi = {
     uploadAvatar(file) {
         const fd = new FormData()
         fd.append('file', file)
-        const token = localStorage.getItem('token')
         return request.post('/api/user/avatar', fd, {
-            headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
+            headers: { 'Content-Type': 'multipart/form-data' }
         })
     },
     getFollowStats() {
-        return request.get('/user/follow-stats')
+        return request.get('/api/user/follow-stats')
+    },
+    getMyBars() {
+        return request.get('/api/user/bars')
+    },
+    followUser(targetUserId) {
+        return request.post(`/api/user/follow/${targetUserId}`)
+    },
+    unfollowUser(targetUserId) {
+        return request.delete(`/api/user/follow/${targetUserId}`)
     }
 }

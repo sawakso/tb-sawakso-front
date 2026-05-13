@@ -8,6 +8,7 @@
           :isDarkTheme="isDarkTheme"
           @openAuth="showAuth = true"
           @toggleTheme="toggleTheme"
+          @createPost="showCreatePost = true"
       />
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -15,31 +16,33 @@
         </transition>
       </router-view>
       <AuthModal v-if="showAuth" @close="showAuth = false" @loginSuccess="onLoginSuccess" />
+      <CreatePost v-if="showCreatePost" :visible="showCreatePost" @close="showCreatePost = false" />
       <Footer :title="title" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, provide } from 'vue'
+import { ref, onMounted, onUnmounted, provide, computed } from 'vue'
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '@/components/Navbar/Navbar.vue'
 import Footer from '@/components/Footer/Footer.vue'
 import AuthModal from '@/components/AuthModal/AuthModal.vue'
-import { useUser } from '@/composables/useUser'
+import CreatePost from '@/components/CreatePost/CreatePost.vue'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
-const { user } = useUser()
+const userStore = useUserStore()
+const user = computed(() => userStore.userInfo)
 
 const title = ref(import.meta.env.VITE_APP_TITLE)
 const isDarkTheme = ref(true)
 const showAuth = ref(false)
+const showCreatePost = ref(false)
 const bgCanvas = ref(null)
 
 const onLoginSuccess = (data) => {
-  user.value = data
-  localStorage.setItem('user', JSON.stringify(data))
   showAuth.value = false
 }
 

@@ -94,6 +94,19 @@ const fetchBar = async (id) => {
   bar.value = allBars.find(b => b.id === Number(id))
   barPosts.value = await postsApi.getAll({ barId: id })
   friendBars.value = allBars.filter(b => b.id !== Number(id)).slice(0, 5)
+
+  // 检查当前用户是否已关注此贴吧
+  if (user.value) {
+    try {
+      const myBars = await barsApi.getAll() // 这里应该调 getMyBars，但先简单判断
+      // 实际上需要调 user/bars 接口
+      const { userApi } = await import('@/request/api/user.js')
+      const followed = await userApi.getMyBars()
+      joined.value = followed.some(b => b.id === Number(id))
+    } catch (e) {
+      joined.value = false
+    }
+  }
 }
 
 onMounted(() => fetchBar(route.params.id))
@@ -105,7 +118,22 @@ const sortedPosts = computed(() => {
   return list.sort((a, b) => b.view_count - a.view_count)
 })
 
-const toggleJoin = () => { joined.value = !joined.value }
+const toggleJoin = async () => {
+  if (!user.value) { showAuth.value = true; return }
+  try {
+    if (joined.value) {
+      await barsApi.unfollow(route.params.id)
+      joined.value = false
+      if (bar.value) bar.value.member_count = Math.max((bar.value.member_count || 1) - 1, 0)
+    } else {
+      await barsApi.follow(route.params.id)
+      joined.value = true
+      if (bar.value) bar.value.member_count = (bar.value.member_count || 0) + 1
+    }
+  } catch (e) {
+    console.error('关注操作失败:', e)
+  }
+}
 </script>
 
 <style scoped>

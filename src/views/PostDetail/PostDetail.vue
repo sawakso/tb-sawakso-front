@@ -76,7 +76,7 @@
       </article>
 
       <!-- 评论区 -->
-      <CommentList v-if="post" :postId="post.id" />
+      <CommentList v-if="post" :postId="post.id" ref="commentListRef" @needLogin="showAuth = true" />
     </main>
 
     <!-- 右侧边栏 -->
@@ -114,9 +114,9 @@ import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import BarCard from '@/components/BarCard/BarCard.vue'
 import CommentList from '@/components/CommentList/CommentList.vue'
 import { useUser } from '@/composables/useUser'
-import { bars } from '@/data/bars.js'
-import { users } from '@/data/user.js'
+import { barsApi } from '@/request/api/bars.js'
 import { postsApi } from '@/request/api/posts.js'
+import { reactionsApi } from '@/request/api/reactions.js'
 
 const route = useRoute()
 const { user } = useUser()
@@ -125,32 +125,35 @@ const showAuth = ref(false)
 const liked = ref(false)
 const post = ref(null)
 const relatedPosts = ref([])
+const allBars = ref([])
+
+// 评论组件引用
+const commentListRef = ref(null)
 
 const currentBar = computed(() => {
   if (!post.value) return null
-  return bars.find(b => b.id === post.value.bar_id)
+  return allBars.value.find(b => b.id === post.value.bar_id)
 })
 
 onMounted(async () => {
   post.value = await postsApi.getById(route.params.id)
   const allBarPosts = await postsApi.getAll({ barId: post.value.bar_id })
   relatedPosts.value = allBarPosts.filter(p => p.id !== post.value.id).slice(0, 5)
+  allBars.value = await barsApi.getAll()
 })
 
 const authorName = computed(() => {
   if (!post.value) return ''
-  const u = users.find(u => u.id === post.value.user_id)
-  return u?.username || '用户' + post.value.user_id
+  return post.value.nickname || post.value.username || `用户${post.value.user_id}`
 })
 
 const authorAvatar = computed(() => {
   if (!post.value) return '/images/default-avatar.png'
-  const u = users.find(u => u.id === post.value.user_id)
-  return u?.avatar || '/images/default-avatar.png'
+  return post.value.avatar || '/images/default-avatar.png'
 })
 
 const barName = computed(() => {
-  const b = bars.find(b => b.id === post.value?.bar_id)
+  const b = allBars.value.find(b => b.id === post.value?.bar_id)
   return b?.name || ''
 })
 
@@ -173,7 +176,26 @@ const renderedContent = computed(() => {
       .replace(/\n/g, '<br>')
 })
 
-const handleLike = () => { liked.value = !liked.value }
+const handleLike = async () => {
+  if (!user.value) { showAuth.value = true; return }
+  try {
+    const res = await reactionsApi.toggle({
+      target_type: 'post',
+      target_id: post.value.id,
+      reaction_type: 'like'
+    })
+    // 更新本地状态和计数
+    if (res.action === 'removed' || (res.action && res.action !== 'added' && res.action !== 'switched')) {
+      liked.value = false
+      post.value.like_count = Math.max((post.value.like_count || 0) - 1, 0)
+    } else {
+      liked.value = true
+      post.value.like_count = (post.value.like_count || 0) + 1
+    }
+  } catch (e) {
+    console.error('点赞失败:', e)
+  }
+}
 </script>
 
 <style scoped>

@@ -6,5 +6,11 @@ export const barsApi = {
     },
     getById(id) {
         return request.get(`/bars/${id}`)
+    },
+    follow(barId) {
+        return request.post(`/user/bar/${barId}`)
+    },
+    unfollow(barId) {
+        return request.delete(`/user/bar/${barId}`)
     }
 }

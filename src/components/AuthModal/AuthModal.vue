@@ -71,8 +71,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { userApi } from '@/request/api/user'
+import { useUserStore } from '@/stores/user'
 
 const emit = defineEmits(['close', 'loginSuccess'])
+const userStore = useUserStore()
 
 const isLogin = ref(true)
 const isCodeMode = ref(false)
@@ -142,10 +144,11 @@ const handleSubmit = async () => {
           : await userApi.login({ username: username.value.trim(), password: password.value })
 
       if (res.code === 200) {
-        localStorage.setItem('token', res.data.token)
-        localStorage.setItem('user', JSON.stringify({ ...res.data, id: res.data.userId }))
+        const userInfo = { ...res.data, id: res.data.userId }
+        userStore.setToken(res.data.token)
+        userStore.setUserInfo(userInfo)
         successMsg.value = '✅ 登录成功！'
-        setTimeout(() => { emit('loginSuccess', res.data); close() }, 800)
+        setTimeout(() => { emit('loginSuccess', userInfo); close() }, 800)
       } else {
         errorMsg.value = res.message || '登录失败'
       }

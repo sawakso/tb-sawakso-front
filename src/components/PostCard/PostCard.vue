@@ -37,20 +37,16 @@
 
 <script setup>
 import { computed } from 'vue'
-import { users } from '@/data/user.js'
-import { bars } from '@/data/bars.js'
 
 const props = defineProps({ post: Object })
 defineEmits(['click'])
 
 const avatar = computed(() => {
-  const u = users.find(u => u.id === props.post.user_id)
-  return u?.avatar || '/images/default-avatar.png'
+  return props.post.avatar || '/images/default-avatar.png'
 })
 
 const username = computed(() => {
-  const u = users.find(u => u.id === props.post.user_id)
-  return u?.username || '未知用户'
+  return props.post.nickname || props.post.username || `用户${props.post.user_id}`
 })
 
 const excerpt = computed(() => {
@@ -59,8 +55,7 @@ const excerpt = computed(() => {
 })
 
 const barName = computed(() => {
-  const b = bars.find(b => b.id === props.post.bar_id)
-  return b?.name || '未知贴吧'
+  return props.post.bar_name || '未知贴吧'
 })
 
 const mediaRatio = computed(() => {
