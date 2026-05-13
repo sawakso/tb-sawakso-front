@@ -111,7 +111,7 @@ const toggleJoin = () => { joined.value = !joined.value }
 <style scoped>
 .bar-layout { display: flex; min-height: calc(100vh - 96px); }
 
-.main-content { flex: 1; padding: 30px 40px; max-width: 750px; }
+.main-content { flex: 1; padding: 30px 40px; max-width: 900px; }
 
 .bar-header {
   margin-bottom: 24px;

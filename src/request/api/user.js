@@ -32,5 +32,8 @@ export const userApi = {
         return request.post('/api/user/avatar', fd, {
             headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` }
         })
+    },
+    getFollowStats() {
+        return request.get('/user/follow-stats')
     }
 }

@@ -55,57 +55,181 @@ provide('toggleTheme', toggleTheme)
 // Canvas 动画
 let animationId = null, particles = []
 let removeResizeListener = null
+
+//
+// function initCanvas() {
+//   const canvas = bgCanvas.value
+//   if (!canvas) return
+//   const ctx = canvas.getContext('2d')
+//   const resizeCanvas = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
+//   const createParticles = () => {
+//     particles = []
+//     for (let i = 0; i < Math.floor((canvas.width * canvas.height) / 15000); i++) {
+//       particles.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, radius: Math.random() * 2 + 0.5, speedX: (Math.random() - 0.5) * 0.3, speedY: (Math.random() - 0.5) * 0.3, opacity: Math.random() * 0.5 + 0.2 })
+//     }
+//   }
+//   const drawParticles = () => {
+//     ctx.clearRect(0, 0, canvas.width, canvas.height)
+//     const c = !isDarkTheme.value ? '0, 0, 0' : '255, 255, 255'
+//     const len = particles.length
+//
+//     particles.forEach((p, i) => {
+//       ctx.beginPath()
+//       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
+//       ctx.fillStyle = `rgba(${c}, ${p.opacity})`
+//       ctx.fill()
+//
+//       for (let j = i + 1; j < len; j++) {
+//         const o = particles[j]
+//         const dx = p.x - o.x
+//         const dy = p.y - o.y
+//         const d = Math.sqrt(dx * dx + dy * dy)
+//         if (d < 100) {
+//           ctx.beginPath()
+//           ctx.strokeStyle = `rgba(${c}, ${0.1 * (1 - d / 100)})`
+//           ctx.lineWidth = 0.5
+//           ctx.moveTo(p.x, p.y)
+//           ctx.lineTo(o.x, o.y)
+//           ctx.stroke()
+//         }
+//       }
+//
+//       p.x += p.speedX
+//       p.y += p.speedY
+//       if (p.x < 0 || p.x > canvas.width) p.speedX *= -1
+//       if (p.y < 0 || p.y > canvas.height) p.speedY *= -1
+//     })
+//     animationId = requestAnimationFrame(drawParticles)
+//   }
+//   const handleResize = () => {
+//     resizeCanvas()
+//     createParticles()
+//   }
+//   window.addEventListener('resize', handleResize)
+//   removeResizeListener = () => window.removeEventListener('resize', handleResize)
+//   resizeCanvas(); createParticles(); drawParticles()
+// }
 function initCanvas() {
   const canvas = bgCanvas.value
   if (!canvas) return
   const ctx = canvas.getContext('2d')
-  const resizeCanvas = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight }
-  const createParticles = () => {
-    particles = []
-    for (let i = 0; i < Math.floor((canvas.width * canvas.height) / 15000); i++) {
-      particles.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, radius: Math.random() * 2 + 0.5, speedX: (Math.random() - 0.5) * 0.3, speedY: (Math.random() - 0.5) * 0.3, opacity: Math.random() * 0.5 + 0.2 })
-    }
+  let width = canvas.width = window.innerWidth
+  let height = canvas.height = window.innerHeight
+  const isDark = isDarkTheme.value
+
+  // 颜色调色板
+  const palettes = isDark ? [
+    [94, 129, 255],    // 蓝
+    [255, 94, 156],    // 粉
+    [0, 217, 192],     // 青
+    [255, 179, 71],    // 橙
+    [186, 85, 211],    // 紫
+  ] : [
+    [67, 97, 238],
+    [247, 37, 133],
+    [76, 201, 240],
+    [244, 140, 6],
+    [147, 51, 234],
+  ]
+
+  const randomColor = (alpha = 0.12) => {
+    const p = palettes[Math.floor(Math.random() * palettes.length)]
+    return { r: p[0], g: p[1], b: p[2], alpha }
   }
-  const drawParticles = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    const c = !isDarkTheme.value ? '0, 0, 0' : '255, 255, 255'
-    const len = particles.length
 
-    particles.forEach((p, i) => {
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(${c}, ${p.opacity})`
-      ctx.fill()
+  const colorString = (c, a = c.alpha) => `rgba(${c.r},${c.g},${c.b},${a})`
 
-      for (let j = i + 1; j < len; j++) {
-        const o = particles[j]
-        const dx = p.x - o.x
-        const dy = p.y - o.y
-        const d = Math.sqrt(dx * dx + dy * dy)
-        if (d < 100) {
-          ctx.beginPath()
-          ctx.strokeStyle = `rgba(${c}, ${0.1 * (1 - d / 100)})`
-          ctx.lineWidth = 0.5
-          ctx.moveTo(p.x, p.y)
-          ctx.lineTo(o.x, o.y)
-          ctx.stroke()
-        }
-      }
-
-      p.x += p.speedX
-      p.y += p.speedY
-      if (p.x < 0 || p.x > canvas.width) p.speedX *= -1
-      if (p.y < 0 || p.y > canvas.height) p.speedY *= -1
+  // 几何图形
+  const shapes = []
+  const types = ['rect', 'circle', 'triangle']
+  for (let i = 0; i < 30; i++) {
+    shapes.push({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      size: Math.random() * 120 + 40,
+      type: types[Math.floor(Math.random() * 3)],
+      dx: (Math.random() - 0.5) * 0.2,
+      dy: (Math.random() - 0.5) * 0.2,
+      angle: Math.random() * Math.PI * 2,
+      dAngle: (Math.random() - 0.5) * 0.0008,
+      color: randomColor(),
+      glow: Math.random() * 0.15 + 0.05
     })
-    animationId = requestAnimationFrame(drawParticles)
   }
+
+  // 光点
+  const lights = []
+  for (let i = 0; i < 20; i++) {
+    lights.push({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      r: Math.random() * 2.5 + 0.5,
+      dx: (Math.random() - 0.5) * 0.15,
+      dy: (Math.random() - 0.5) * 0.15,
+      baseAlpha: Math.random() * 0.3 + 0.1
+    })
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, width, height)
+    // 底色
+    ctx.fillStyle = isDark ? 'rgba(10,12,18,0.95)' : 'rgba(248,250,252,0.95)'
+    ctx.fillRect(0, 0, width, height)
+
+    // 几何图形
+    for (const s of shapes) {
+      ctx.save()
+      ctx.translate(s.x, s.y)
+      ctx.rotate(s.angle)
+
+      const a = s.color.alpha + Math.sin(Date.now() / 3000 + s.size) * s.glow
+      ctx.fillStyle = colorString(s.color, Math.max(0.02, a))
+      ctx.shadowColor = colorString(s.color, 0.08)
+      ctx.shadowBlur = 30
+
+      ctx.beginPath()
+      if (s.type === 'rect') {
+        ctx.roundRect(-s.size / 2, -s.size / 2, s.size, s.size, s.size * 0.2)
+      } else if (s.type === 'circle') {
+        ctx.arc(0, 0, s.size / 2, 0, Math.PI * 2)
+      } else {
+        const h = s.size * 0.866
+        ctx.moveTo(0, -h / 2)
+        ctx.lineTo(s.size / 2, h / 2)
+        ctx.lineTo(-s.size / 2, h / 2)
+        ctx.closePath()
+      }
+      ctx.fill()
+      ctx.restore()
+
+      s.x += s.dx; s.y += s.dy; s.angle += s.dAngle
+      if (s.x < -s.size || s.x > width + s.size) s.dx *= -1
+      if (s.y < -s.size || s.y > height + s.size) s.dy *= -1
+    }
+
+    // 光点
+    for (const l of lights) {
+      const flicker = l.baseAlpha + Math.sin(Date.now() / 2000 + l.r) * 0.1
+      ctx.fillStyle = `rgba(255,255,255,${Math.max(0.02, flicker)})`
+      ctx.beginPath()
+      ctx.arc(l.x, l.y, l.r, 0, Math.PI * 2)
+      ctx.fill()
+      l.x += l.dx; l.y += l.dy
+      if (l.x < 0 || l.x > width) l.dx *= -1
+      if (l.y < 0 || l.y > height) l.dy *= -1
+    }
+
+    animationId = requestAnimationFrame(draw)
+  }
+
   const handleResize = () => {
-    resizeCanvas()
-    createParticles()
+    width = canvas.width = window.innerWidth
+    height = canvas.height = window.innerHeight
   }
   window.addEventListener('resize', handleResize)
   removeResizeListener = () => window.removeEventListener('resize', handleResize)
-  resizeCanvas(); createParticles(); drawParticles()
+
+  draw()
 }
 onMounted(() => {
   if (localStorage.getItem('theme') === 'light') { isDarkTheme.value = false; document.body.classList.add('light-theme') }

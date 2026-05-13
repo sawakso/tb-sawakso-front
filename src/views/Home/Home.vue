@@ -6,13 +6,14 @@
         @openAuth="showAuth = true"
     />
     <main class="main-content">
-        <PostCard
-            v-for="post in posts"
-            :key="post.id"
-            :post="post"
-            @click="goToPost(post.id)"
-        />
+      <PostCard
+          v-for="post in posts"
+          :key="post.id"
+          :post="post"
+          @click="goToPost(post.id)"
+      />
     </main>
+    <RightSidebar />
   </div>
 </template>
 <script setup>
@@ -20,8 +21,10 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import PostCard from '@/components/PostCard/PostCard.vue'
+import RightSidebar from '@/components/RightSidebar/RightSidebar.vue'
 import { useUser } from '@/composables/useUser'
 import { postsApi } from '@/request/api/posts.js'
+
 
 const router = useRouter()
 const { user } = useUser()
@@ -42,7 +45,7 @@ const handleCreatePost = () => {
 
 <style scoped>
 .home-layout { display: flex; min-height: calc(100vh - 96px); }
-.main-content { flex: 1; padding: 30px 40px; }
+.main-content { flex: 1; padding: 30px 40px; max-width: 900px;}
 .content-header {
   display: flex;
   justify-content: space-between;

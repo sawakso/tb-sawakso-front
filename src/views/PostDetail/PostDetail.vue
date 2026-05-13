@@ -186,7 +186,7 @@ const handleLike = () => { liked.value = !liked.value }
 .main-content {
   flex: 1;
   padding: 30px 40px;
-  max-width: 750px;
+  max-width: 900px;
 }
 
 .content-top {

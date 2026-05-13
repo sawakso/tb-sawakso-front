@@ -94,6 +94,7 @@ const handleImgError = (e) => {
   padding: 20px;
   cursor: pointer;
   transition: var(--transition);
+  margin-bottom: 20px;
 }
 .post-card:hover {
   border-color: var(--primary-color);

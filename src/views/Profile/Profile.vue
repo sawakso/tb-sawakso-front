@@ -5,38 +5,31 @@
     <main class="main-content">
       <!-- 用户头部 -->
       <div class="profile-header">
-        <img :src="profile.avatar || '/images/default-avatar.png'" class="profile-avatar" />
+        <div class="profile-left">
+          <img :src="profile.avatar || '/images/default-avatar.png'" class="profile-avatar" />
+          <div class="mini-stats">
+            <span @click="tab = 'following'"><strong>{{ followStats.following }}</strong> 关注</span>
+            <span @click="tab = 'followers'"><strong>{{ followStats.followers }}</strong> 粉丝</span>
+          </div>
+        </div>
         <div class="profile-center">
           <h1>{{ profile.nickname || profile.username }}</h1>
           <p class="profile-username">@{{ profile.username }}</p>
-          <div class="follow-inline">
-            <span class="follow-item" @click="tab = 'following'">
-              <span class="follow-num">0</span>
-              <span class="follow-dot"></span>
-              <span class="follow-label">关注</span>
-            </span>
-                      <span class="follow-item" @click="tab = 'followers'">
-              <span class="follow-num">0</span>
-              <span class="follow-dot"></span>
-              <span class="follow-label">粉丝</span>
-            </span>
-          </div>
         </div>
         <button class="edit-btn" @click="showEdit = true">
           <i class="fas fa-edit"></i> 编辑资料
         </button>
       </div>
 
-
       <!-- 数据统计 — 可点击切换 -->
       <div class="stats-row">
         <div class="stat-card" :class="{ active: tab === 'posts' }" @click="tab = 'posts'">
           <span class="stat-num">{{ myPosts.length }}</span>
-          <span class="stat-label">我的帖子</span>
+          <span class="stat-label">帖子</span>
         </div>
         <div class="stat-card" :class="{ active: tab === 'comments' }" @click="tab = 'comments'">
           <span class="stat-num">{{ myComments.length }}</span>
-          <span class="stat-label">我的回复</span>
+          <span class="stat-label">回复</span>
         </div>
         <div class="stat-card" :class="{ active: tab === 'likes' }" @click="tab = 'likes'">
           <span class="stat-num">{{ totalLikes }}</span>
@@ -77,12 +70,10 @@
 
       <!-- 获赞 -->
       <div v-if="tab === 'likes'" class="tab-content">
-        <!-- 帖子获赞 -->
         <template v-if="likeTab === 'posts'">
           <PostCard v-for="p in likedPosts" :key="p.id" :post="p" @click="$router.push('/post/' + p.id)" />
           <p v-if="likedPosts.length === 0" class="empty">暂无帖子获赞</p>
         </template>
-        <!-- 评论获赞 -->
         <template v-if="likeTab === 'comments'">
           <div v-for="c in likedComments" :key="c.id" class="comment-row" @click="$router.push('/post/' + c.post_id)">
             <p class="comment-text">{{ c.content }}</p>
@@ -129,7 +120,6 @@ import BarCard from '@/components/BarCard/BarCard.vue'
 import EditProfile from '@/components/EditProfile/EditProfile.vue'
 import { useUser } from '@/composables/useUser'
 import { postsApi } from '@/request/api/posts.js'
-import { commentsApi } from '@/request/api/comments.js'
 import { barsApi } from '@/request/api/bars.js'
 import { userApi } from '@/request/api/user.js'
 
@@ -148,17 +138,22 @@ const myBars = ref([])
 const likedPosts = ref([])
 const likedComments = ref([])
 const allPosts = ref([])
-
-const followingList = ref([])
-const followerList = ref([])
+const followStats = ref({ following: 0, followers: 0 })
 
 const fetchProfile = async () => {
   const data = await userApi.getMe()
-  profile.value = data.data || data  // id 在 data.data.id
-  // 同步到 composable
+  profile.value = data.data || data
   if (user.value) {
     user.value.avatar = profile.value.avatar
     user.value.nickname = profile.value.nickname
+  }
+}
+
+const fetchFollowStats = async () => {
+  try {
+    followStats.value = await userApi.getFollowStats()
+  } catch (e) {
+    console.error('获取关注统计失败:', e)
   }
 }
 
@@ -178,11 +173,10 @@ onMounted(async () => {
   if (!user.value) { router.push('/'); return }
 
   await fetchProfile()
+  await fetchFollowStats()
   const userId = profile.value.userId || profile.value.id
 
-  // 并行获取所有数据
   allPosts.value = await postsApi.getAll()
-
   myPosts.value = allPosts.value.filter(p => Number(p.user_id) === Number(userId))
 
   const commentsPromises = allPosts.value.map(p =>
@@ -212,10 +206,19 @@ onMounted(async () => {
   border: 1px solid var(--border-color); border-radius: var(--border-radius);
   margin-bottom: 20px;
 }
-.profile-avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-color); }
-.profile-info h1 { font-size: 1.4rem; margin-bottom: 4px; }
-.profile-username { color: var(--text-secondary); font-size: 0.9rem; }
-.profile-join { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
+.profile-left {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.profile-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-color); }
+.mini-stats {
+  display: flex; gap: 12px; font-size: 0.8rem; color: var(--text-secondary);
+}
+.mini-stats span { cursor: pointer; }
+.mini-stats span:hover { color: var(--primary-color); }
+.mini-stats strong { color: var(--text-color); }
+.profile-center { flex: 1; }
+.profile-center h1 { font-size: 1.3rem; margin-bottom: 2px; }
+.profile-username { color: var(--text-secondary); font-size: 0.85rem; }
 .edit-btn {
   margin-left: auto; padding: 8px 20px; border: 1px solid var(--primary-color);
   border-radius: 20px; background: transparent; color: var(--primary-color);
@@ -223,7 +226,6 @@ onMounted(async () => {
 }
 .edit-btn:hover { background: var(--primary-color); color: #fff; }
 
-/* 统计卡片 */
 .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
 .stat-card {
   display: flex; flex-direction: column; align-items: center; padding: 14px 8px;
@@ -235,7 +237,6 @@ onMounted(async () => {
 .stat-num { font-size: 1.4rem; font-weight: 700; color: var(--primary-color); }
 .stat-label { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; }
 
-/* 二级菜单 */
 .sub-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .sub-tabs button {
   padding: 6px 18px; border: 1px solid var(--border-color); border-radius: 16px;
@@ -257,32 +258,18 @@ onMounted(async () => {
 
 .bars-grid { display: flex; flex-direction: column; gap: 12px; }
 .empty { text-align: center; color: var(--text-secondary); padding: 60px 0; }
-/* 关注/粉丝 */
-.follow-inline {
-  display: flex; gap: 6px; font-size: 0.85rem; margin-top: 6px;
+
+.user-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; background: var(--surface-color);
+  border: 1px solid var(--border-color); border-radius: var(--border-radius);
 }
-.follow-item {
-  display: flex; align-items: center; gap: 4px;
-  padding: 4px 12px; border-radius: 14px;
-  background: var(--surface-color);
-  border: 1px solid var(--border-color);
-  cursor: pointer; transition: var(--transition);
-  user-select: none;
+.user-row-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.user-row-name { flex: 1; font-weight: 500; }
+.unfollow-btn {
+  padding: 4px 14px; border: 1px solid var(--border-color);
+  border-radius: 14px; background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 0.8rem;
 }
-.follow-item:hover {
-  border-color: var(--primary-color);
-  background: rgba(94, 129, 255, 0.06);
-}
-.follow-item:active {
-  transform: scale(0.96);
-}
-.follow-num {
-  font-weight: 700; color: var(--text-color); font-size: 0.9rem;
-}
-.follow-dot {
-  width: 4px; height: 4px; border-radius: 50%; background: var(--primary-color);
-}
-.follow-label {
-  color: var(--text-secondary); font-size: 0.8rem;
-}
+.unfollow-btn:hover { border-color: var(--secondary-color); color: var(--secondary-color); }
 </style>

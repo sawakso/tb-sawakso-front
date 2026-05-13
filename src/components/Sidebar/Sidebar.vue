@@ -13,22 +13,6 @@
       <i class="fas fa-chevron-right arrow"></i>
     </div>
 
-    <!-- 数据统计（登录后显示） -->
-    <div class="user-stats" v-if="user">
-      <div class="stat-item" @click="$router.push('/profile?tab=posts')">
-        <span class="stat-num">{{ stats.posts }}</span>
-        <span class="stat-label">帖子</span>
-      </div>
-      <div class="stat-item" @click="$router.push('/profile?tab=bars')">
-        <span class="stat-num">{{ stats.bars }}</span>
-        <span class="stat-label">关注</span>
-      </div>
-      <div class="stat-item" @click="$router.push('/profile')">
-        <span class="stat-num">{{ stats.likes }}</span>
-        <span class="stat-label">获赞</span>
-      </div>
-    </div>
-
     <!-- 我的贴吧（登录后显示） -->
     <div class="menu-section" v-if="user && myBars.length > 0">
       <h3 class="section-title">我的贴吧</h3>
@@ -57,30 +41,37 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { barsApi } from '@/request/api/bars.js'
+import { postsApi } from '@/request/api/posts.js'
 
 const props = defineProps({ user: Object, title: String })
 defineEmits(['openAuth'])
 
 const allBars = ref([])
+const stats = ref({ posts: 0, bars: 0, likes: 0 })
 
 onMounted(async () => {
-  allBars.value = await barsApi.getAll()
+  const [bars, posts] = await Promise.all([barsApi.getAll(), postsApi.getAll()])
+  allBars.value = bars
+
+  // 统计当前用户数据
+  if (props.user) {
+    const myPosts = posts.filter(p => Number(p.user_id) === Number(props.user.userId || props.user.id))
+    stats.value.posts = myPosts.length
+    stats.value.likes = myPosts.reduce((s, p) => s + (p.like_count || 0), 0)
+  }
+  stats.value.bars = allBars.value.length
 })
 
 const hotBars = computed(() => {
-  return [...allBars.value].sort((a, b) => (b.member_count || 0) - (a.member_count || 0)).slice(0, 5)
+  return [...allBars.value]
+      .sort((a, b) => (b.member_count || 0) - (a.member_count || 0))
+      .slice(0, 5)
 })
 
 const myBars = computed(() => {
   if (!props.user) return []
-  return allBars.value.slice(0, 3) // TODO: 接真实关注数据
+  return allBars.value.slice(0, 3)
 })
-
-const stats = computed(() => ({
-  posts: 0,   // TODO: 接真实数据
-  bars: myBars.value.length,
-  likes: 0    // TODO: 接真实数据
-}))
 </script>
 
 <style scoped>
