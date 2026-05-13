@@ -42,6 +42,7 @@ import CommentItem from './CommentItem.vue'
 import { commentsApi } from '@/request/api/comments.js'
 import { reactionsApi } from '@/request/api/reactions.js'
 import { useUser } from '@/composables/useUser'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
   postId: {
@@ -53,6 +54,7 @@ const props = defineProps({
 defineEmits(['needLogin'])
 
 const { user } = useUser()
+const userStore = useUserStore()
 const newComment = ref('')
 const activeReplyId = ref(null)
 const commentsData = ref([])
@@ -72,6 +74,8 @@ const userAvatar = computed(() => user.value?.avatar || '/images/user.png')
 const fetchComments = async () => {
   const data = await commentsApi.getByPostId(props.postId)
   commentsData.value = Array.isArray(data) ? data : []
+  // 将评论中的用户信息填充到缓存池
+  userStore.extractAndCacheUsers(commentsData.value)
 }
 
 onMounted(fetchComments)

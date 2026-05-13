@@ -37,16 +37,21 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps({ post: Object })
 defineEmits(['click'])
 
+const userStore = useUserStore()
+
 const avatar = computed(() => {
-  return props.post.avatar || '/images/default-avatar.png'
+  const u = userStore.getUser(props.post.user_id)
+  return u?.avatar || '/images/default-avatar.png'
 })
 
 const username = computed(() => {
-  return props.post.nickname || props.post.username || `用户${props.post.user_id}`
+  const u = userStore.getUser(props.post.user_id)
+  return u?.nickname || u?.username || `用户${props.post.user_id}`
 })
 
 const excerpt = computed(() => {

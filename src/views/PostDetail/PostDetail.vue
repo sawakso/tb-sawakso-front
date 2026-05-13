@@ -114,12 +114,14 @@ import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import BarCard from '@/components/BarCard/BarCard.vue'
 import CommentList from '@/components/CommentList/CommentList.vue'
 import { useUser } from '@/composables/useUser'
+import { useUserStore } from '@/stores/user'
 import { barsApi } from '@/request/api/bars.js'
 import { postsApi } from '@/request/api/posts.js'
 import { reactionsApi } from '@/request/api/reactions.js'
 
 const route = useRoute()
 const { user } = useUser()
+const userStore = useUserStore()
 const title = import.meta.env.VITE_APP_TITLE
 const showAuth = ref(false)
 const liked = ref(false)
@@ -137,19 +139,25 @@ const currentBar = computed(() => {
 
 onMounted(async () => {
   post.value = await postsApi.getById(route.params.id)
+  // 将帖子作者信息存入用户缓存池
+  userStore.extractAndCacheUsers(post.value)
   const allBarPosts = await postsApi.getAll({ barId: post.value.bar_id })
+  // 相关帖子的用户信息也缓存
+  userStore.extractAndCacheUsers(allBarPosts)
   relatedPosts.value = allBarPosts.filter(p => p.id !== post.value.id).slice(0, 5)
   allBars.value = await barsApi.getAll()
 })
 
 const authorName = computed(() => {
   if (!post.value) return ''
-  return post.value.nickname || post.value.username || `用户${post.value.user_id}`
+  const u = userStore.getUser(post.value.user_id)
+  return u?.nickname || u?.username || `用户${post.value.user_id}`
 })
 
 const authorAvatar = computed(() => {
   if (!post.value) return '/images/default-avatar.png'
-  return post.value.avatar || '/images/default-avatar.png'
+  const u = userStore.getUser(post.value.user_id)
+  return u?.avatar || '/images/default-avatar.png'
 })
 
 const barName = computed(() => {

@@ -23,17 +23,21 @@ import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import PostCard from '@/components/PostCard/PostCard.vue'
 import RightSidebar from '@/components/RightSidebar/RightSidebar.vue'
 import { useUser } from '@/composables/useUser'
+import { useUserStore } from '@/stores/user'
 import { postsApi } from '@/request/api/posts.js'
 
 
 const router = useRouter()
 const { user } = useUser()
+const userStore = useUserStore()
 const title = import.meta.env.VITE_APP_TITLE
 const showAuth = ref(false)
 const posts = ref([])
 
 onMounted(async () => {
   posts.value = await postsApi.getAll()
+  // 将帖子列表中的用户信息填充到 Pinia 缓存池
+  userStore.extractAndCacheUsers(posts.value)
 })
 
 const goToPost = (id) => router.push('/post/' + id)

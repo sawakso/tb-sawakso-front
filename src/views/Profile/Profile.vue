@@ -6,15 +6,15 @@
       <!-- 用户头部 -->
       <div class="profile-header">
         <div class="profile-left">
-          <img :src="profile.avatar || '/images/default-avatar.png'" class="profile-avatar" />
+          <img :src="userStore.userInfo?.avatar || '/images/default-avatar.png'" class="profile-avatar" />
           <div class="mini-stats">
-            <span @click="tab = 'following'"><strong>{{ followStats.following }}</strong> 关注</span>
-            <span @click="tab = 'followers'"><strong>{{ followStats.followers }}</strong> 粉丝</span>
+            <span @click="tab = 'following'"><strong>{{ userStore.followStats.following }}</strong> 关注</span>
+            <span @click="tab = 'followers'"><strong>{{ userStore.followStats.followers }}</strong> 粉丝</span>
           </div>
         </div>
         <div class="profile-center">
-          <h1>{{ profile.nickname || profile.username }}</h1>
-          <p class="profile-username">@{{ profile.username }}</p>
+          <h1>{{ userStore.userInfo?.nickname || userStore.userInfo?.username }}</h1>
+          <p class="profile-username">@{{ userStore.userInfo?.username }}</p>
         </div>
         <button class="edit-btn" @click="showEdit = true">
           <i class="fas fa-edit"></i> 编辑资料
@@ -24,19 +24,19 @@
       <!-- 数据统计 — 可点击切换 -->
       <div class="stats-row">
         <div class="stat-card" :class="{ active: tab === 'posts' }" @click="tab = 'posts'">
-          <span class="stat-num">{{ myPosts.length }}</span>
+          <span class="stat-num">{{ userStore.myPosts.length }}</span>
           <span class="stat-label">帖子</span>
         </div>
         <div class="stat-card" :class="{ active: tab === 'comments' }" @click="tab = 'comments'">
-          <span class="stat-num">{{ myComments.length }}</span>
+          <span class="stat-num">{{ userStore.myComments.length }}</span>
           <span class="stat-label">回复</span>
         </div>
         <div class="stat-card" :class="{ active: tab === 'likes' }" @click="tab = 'likes'">
-          <span class="stat-num">{{ totalLikes }}</span>
+          <span class="stat-num">{{ userStore.totalLikes }}</span>
           <span class="stat-label">获赞</span>
         </div>
         <div class="stat-card" :class="{ active: tab === 'bars' }" @click="tab = 'bars'">
-          <span class="stat-num">{{ myBars.length }}</span>
+          <span class="stat-num">{{ userStore.myBars.length }}</span>
           <span class="stat-label">关注的吧</span>
         </div>
       </div>
@@ -49,169 +49,105 @@
 
       <!-- 我的帖子 -->
       <div v-if="tab === 'posts'" class="tab-content">
-        <PostCard v-for="p in myPosts" :key="p.id" :post="p" @click="$router.push('/post/' + p.id)" />
-        <p v-if="myPosts.length === 0" class="empty">暂无帖子</p>
+        <PostCard v-for="p in userStore.myPosts" :key="p.id" :post="p" @click="$router.push('/post/' + p.id)" />
+        <p v-if="userStore.myPosts.length === 0" class="empty">暂无帖子</p>
       </div>
 
       <!-- 我的回复 -->
       <div v-if="tab === 'comments'" class="tab-content">
-        <div v-for="c in myComments" :key="c.id" class="comment-row" @click="$router.push('/post/' + c.post_id)">
+        <div v-for="c in userStore.myComments" :key="c.id" class="comment-row" @click="$router.push('/post/' + c.post_id)">
           <p class="comment-text">{{ c.content }}</p>
-          <span class="comment-meta">回复于 · {{ getPostTitle(c.post_id) }}</span>
+          <span class="comment-meta">回复于 · {{ c.post_title || '未知帖子' }}</span>
         </div>
-        <p v-if="myComments.length === 0" class="empty">暂无回复</p>
+        <p v-if="userStore.myComments.length === 0" class="empty">暂无回复</p>
       </div>
 
       <!-- 关注的吧 -->
       <div v-if="tab === 'bars'" class="tab-content bars-grid">
-        <BarCard v-for="b in myBars" :key="b.id" :bar="b" :showJoin="false" />
-        <p v-if="myBars.length === 0" class="empty">还没关注任何吧</p>
+        <BarCard v-for="b in userStore.myBars" :key="b.id" :bar="b" :showJoin="false" />
+        <p v-if="userStore.myBars.length === 0" class="empty">还没关注任何吧</p>
       </div>
 
       <!-- 获赞 -->
       <div v-if="tab === 'likes'" class="tab-content">
         <template v-if="likeTab === 'posts'">
-          <PostCard v-for="p in likedPosts" :key="p.id" :post="p" @click="$router.push('/post/' + p.id)" />
-          <p v-if="likedPosts.length === 0" class="empty">暂无帖子获赞</p>
+          <PostCard v-for="p in userStore.likedPosts" :key="p.id" :post="p" @click="$router.push('/post/' + p.id)" />
+          <p v-if="userStore.likedPosts.length === 0" class="empty">暂无帖子获赞</p>
         </template>
         <template v-if="likeTab === 'comments'">
-          <div v-for="c in likedComments" :key="c.id" class="comment-row" @click="$router.push('/post/' + c.post_id)">
+          <div v-for="c in userStore.likedComments" :key="c.id" class="comment-row" @click="$router.push('/post/' + c.post_id)">
             <p class="comment-text">{{ c.content }}</p>
-            <span class="comment-meta">获赞 {{ c.like_count }} · {{ getPostTitle(c.post_id) }}</span>
+            <span class="comment-meta">获赞 {{ c.like_count }} · {{ c.post_title || '未知帖子' }}</span>
           </div>
-          <p v-if="likedComments.length === 0" class="empty">暂无评论获赞</p>
+          <p v-if="userStore.likedComments.length === 0" class="empty">暂无评论获赞</p>
         </template>
       </div>
 
       <!-- 我关注的人 -->
       <div v-if="tab === 'following'" class="tab-content">
-        <div v-for="u in followingList" :key="u.id" class="user-row">
+        <div v-for="u in userStore.followingList" :key="u.id" class="user-row">
           <img :src="u.avatar || '/images/default-avatar.png'" class="user-row-avatar" />
           <span class="user-row-name">{{ u.nickname || u.username }}</span>
           <button class="unfollow-btn" @click="handleUnfollowUser(u)">取消关注</button>
         </div>
-        <p v-if="followingList.length === 0" class="empty">还没关注任何人</p>
+        <p v-if="userStore.followingList.length === 0" class="empty">还没关注任何人</p>
       </div>
 
       <!-- 关注我的人 -->
       <div v-if="tab === 'followers'" class="tab-content">
-        <div v-for="u in followerList" :key="u.id" class="user-row">
+        <div v-for="u in userStore.followerList" :key="u.id" class="user-row">
           <img :src="u.avatar || '/images/default-avatar.png'" class="user-row-avatar" />
-          <span class="user-row-name">{{ u.username }}</span>
+          <span class="user-row-name">{{ u.nickname || u.username }}</span>
         </div>
-        <p v-if="followerList.length === 0" class="empty">暂无粉丝</p>
+        <p v-if="userStore.followerList.length === 0" class="empty">暂无粉丝</p>
       </div>
     </main>
     <EditProfile
         v-if="showEdit"
-        :user="profile"
+        :user="userStore.userInfo"
         @close="showEdit = false"
-        @update="fetchProfile"
+        @update="handleUpdateProfile"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import PostCard from '@/components/PostCard/PostCard.vue'
 import BarCard from '@/components/BarCard/BarCard.vue'
 import EditProfile from '@/components/EditProfile/EditProfile.vue'
 import { useUser } from '@/composables/useUser'
-import { postsApi } from '@/request/api/posts.js'
-import { barsApi } from '@/request/api/bars.js'
-import { userApi } from '@/request/api/user.js'
+import { useUserStore } from '@/stores/user.js'
 
-const router = useRouter()
 const { user } = useUser()
+const userStore = useUserStore()
 const title = import.meta.env.VITE_APP_TITLE
+
 const showAuth = ref(false)
 const showEdit = ref(false)
 const tab = ref('posts')
 const likeTab = ref('posts')
 
-const profile = ref({})
-const myPosts = ref([])
-const myComments = ref([])
-const myBars = ref([])
-const likedPosts = ref([])
-const likedComments = ref([])
-const allPosts = ref([])
-const followStats = ref({ following: 0, followers: 0 })
-const followingList = ref([])
-const followerList = ref([])
-
-const fetchProfile = async () => {
-  const data = await userApi.getMe()
-  profile.value = data.data || data
-  if (user.value) {
-    user.value.avatar = profile.value.avatar
-    user.value.nickname = profile.value.nickname
-  }
-}
-
-const fetchFollowStats = async () => {
-  try {
-    followStats.value = await userApi.getFollowStats()
-  } catch (e) {
-    console.error('获取关注统计失败:', e)
-  }
-}
-
-const totalLikes = computed(() => {
-  const postLikes = myPosts.value.reduce((s, p) => s + (p.like_count || 0), 0)
-  const commentLikes = myComments.value.reduce((s, c) => s + (c.like_count || 0), 0)
-  return postLikes + commentLikes
-})
-
-const getPostTitle = (postId) => {
-  const p = allPosts.value.find(p => p.id === postId)
-  return p?.title || '未知帖子'
-}
-
-// 取关用户
+// 取关用户（调用 store action）
 const handleUnfollowUser = async (targetUser) => {
   try {
-    await userApi.unfollowUser(targetUser.id || targetUser.userId)
-    followingList.value = followingList.value.filter(u =>
-        (u.id || u.userId) !== (targetUser.id || targetUser.userId)
-    )
-    followStats.value.following = Math.max(followStats.value.following - 1, 0)
+    await userStore.unfollowUser(targetUser)
   } catch (e) {
     console.error('取关失败:', e)
   }
 }
 
+// 编辑资料后刷新
+const handleUpdateProfile = async () => {
+  showEdit.value = false
+  await userStore.fetchProfile()
+}
+
 onMounted(async () => {
   showEdit.value = false
-
-  await fetchProfile()
-  await fetchFollowStats()
-  const userId = profile.value.userId || profile.value.id
-
-  allPosts.value = await postsApi.getAll()
-  myPosts.value = allPosts.value.filter(p => Number(p.user_id) === Number(userId))
-
-  const commentsPromises = allPosts.value.map(p =>
-      fetch(`https://tb-api.sawakso.com/api/posts/${p.id}/comments`).then(r => r.json())
-  )
-  const commentsArrays = await Promise.all(commentsPromises)
-  const allComments = commentsArrays.flat()
-
-  myComments.value = allComments.filter(c => Number(c.user_id) === Number(userId))
-  likedPosts.value = myPosts.value.filter(p => p.like_count > 0)
-  likedComments.value = myComments.value.filter(c => c.like_count > 0)
-
-  const allBars = await barsApi.getAll()
-  myBars.value = await userApi.getMyBars()
-
-  // 获取关注/粉丝列表（目前后端没有列表接口，先用空数组占位）
-  // TODO: 后续可添加 GET /api/user/following 和 GET /api/user/followers 接口
-  followingList.value = []
-  followerList.value = []
-
-  await nextTick()
+  // 一键加载所有个人中心数据
+  await userStore.fetchAllProfileData()
 })
 </script>
 

@@ -43,5 +43,17 @@ export const userApi = {
     },
     unfollowUser(targetUserId) {
         return request.delete(`/api/user/follow/${targetUserId}`)
+    },
+
+    // ==================== 个人中心聚合接口（走 tb-api）====================
+    getMyComments(userId) {
+        // 走 tb-api 域名
+        return request.get(`/user/${userId}/comments`, { baseURL: 'https://tb-api.sawakso.com/api' })
+    },
+    getFollowing(userId) {
+        return request.get(`/user/${userId}/following`, { baseURL: 'https://tb-api.sawakso.com/api' })
+    },
+    getFollowers(userId) {
+        return request.get(`/user/${userId}/followers`, { baseURL: 'https://tb-api.sawakso.com/api' })
     }
 }

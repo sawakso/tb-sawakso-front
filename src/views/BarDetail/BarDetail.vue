@@ -76,11 +76,13 @@ import { useRoute } from 'vue-router'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import PostCard from '@/components/PostCard/PostCard.vue'
 import { useUser } from '@/composables/useUser'
+import { useUserStore } from '@/stores/user'
 import { barsApi } from '@/request/api/bars.js'
 import { postsApi } from '@/request/api/posts.js'
 
 const route = useRoute()
 const { user } = useUser()
+const userStore = useUserStore()
 const title = import.meta.env.VITE_APP_TITLE
 const showAuth = ref(false)
 const joined = ref(false)
@@ -93,6 +95,8 @@ const fetchBar = async (id) => {
   const allBars = await barsApi.getAll()
   bar.value = allBars.find(b => b.id === Number(id))
   barPosts.value = await postsApi.getAll({ barId: id })
+  // 将帖子用户信息缓存到 Pinia
+  userStore.extractAndCacheUsers(barPosts.value)
   friendBars.value = allBars.filter(b => b.id !== Number(id)).slice(0, 5)
 
   // 检查当前用户是否已关注此贴吧

@@ -85,6 +85,7 @@
 
 <script setup>
 import { computed, ref, nextTick, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
   comment: {
@@ -101,18 +102,21 @@ const props = defineProps({
 
 const emit = defineEmits(['react', 'reply', 'toggleReply'])
 
+const userStore = useUserStore()
+
 const showReplyInput = ref(false)
 const replyContent = ref('')
 const replyInputRef = ref(null)
 
-// 用户信息：优先使用后端返回的字段，兜底用 user_id
+// 用户信息：从 Pinia 用户缓存池获取
 const authorAvatar = computed(() => {
-  if (props.comment.avatar) return props.comment.avatar
-  return '/images/default-avatar.png'
+  const u = userStore.getUser(props.comment.user_id)
+  return u?.avatar || '/images/default-avatar.png'
 })
 
 const authorName = computed(() => {
-  return props.comment.nickname || props.comment.username || `用户${props.comment.user_id}`
+  const u = userStore.getUser(props.comment.user_id)
+  return u?.nickname || u?.username || `用户${props.comment.user_id}`
 })
 
 // 从评论列表中查找用户名（用于 reply_to 显示）
