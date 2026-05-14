@@ -604,7 +604,14 @@ const handleSubmit = async () => {
     // 更新帖子（如果有媒体文件）
     if (Object.keys(updatePayload).length > 0) {
       try {
-        const updateRes = await postsApi.update(postId, updatePayload)
+        // 后端 PUT 接口要求必须传 title + content（通用编辑接口）
+        const fullPayload = {
+          title: form.value.title.trim(),
+          content: form.value.content.trim(),
+          ...updatePayload
+        }
+        console.log('[CreatePost] 最终 fullPayload:', JSON.stringify(fullPayload))
+        const updateRes = await postsApi.update(postId, fullPayload)
         console.log('[CreatePost] ✅ 帖子媒体更新成功! 返回:', JSON.stringify(updateRes))
       } catch (updateErr) {
         console.error('[CreatePost] ❌ 更新帖子媒体失败!', updateErr)
