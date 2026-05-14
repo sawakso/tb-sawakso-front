@@ -155,7 +155,7 @@ const handleDeletePost = async (postId) => {
 <style scoped>
 .bar-layout { display: flex; min-height: calc(100vh - 96px); }
 
-.main-content { flex: 1; padding: 30px 40px; max-width: 900px; }
+.main-content { flex: 1; padding: 30px 40px; max-width: 1200px; }
 
 .bar-header {
   margin-bottom: 24px;

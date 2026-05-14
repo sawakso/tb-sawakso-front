@@ -5,7 +5,7 @@
         :title="title"
         @openAuth="showAuth = true"
     />
-    <main class="main-content">
+    <main class="main-content" :style="{ marginRight: rightbarOpen ? '260px' : '0' }">
       <PostCard
           v-for="post in posts"
           :key="post.id"
@@ -14,11 +14,12 @@
           @delete="handleDeletePost"
       />
     </main>
-    <RightSidebar />
+    <RightSidebar ref="rightbarRef" />
   </div>
 </template>
+
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import PostCard from '@/components/PostCard/PostCard.vue'
@@ -34,10 +35,16 @@ const userStore = useUserStore()
 const title = import.meta.env.VITE_APP_TITLE
 const showAuth = ref(false)
 const posts = ref([])
+const rightbarRef = ref(null)
+const rightbarOpen = ref(true)
+
+// 监听右侧边栏状态
+watch(() => rightbarRef.value?.rightbarOpen, (val) => {
+  if (val !== undefined) rightbarOpen.value = val
+})
 
 onMounted(async () => {
   posts.value = await postsApi.getAll()
-  // 将帖子列表中的用户信息填充到 Pinia 缓存池
   userStore.extractAndCacheUsers(posts.value)
 })
 
@@ -61,7 +68,10 @@ const handleDeletePost = async (postId) => {
 
 <style scoped>
 .home-layout { display: flex; min-height: calc(100vh - 96px); }
-.main-content { flex: 1; padding: 30px 40px; max-width: 900px;}
+.main-content {
+  flex: 1; padding: 30px 40px; max-width: 1200px;
+  transition: margin-right 0.3s;
+}
 .content-header {
   display: flex;
   justify-content: space-between;
@@ -84,10 +94,4 @@ const handleDeletePost = async (postId) => {
   transition: var(--transition);
 }
 .post-btn:hover { background: var(--secondary-color); }
-
-.post-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
 </style>

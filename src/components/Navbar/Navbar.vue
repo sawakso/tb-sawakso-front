@@ -11,10 +11,10 @@
     <nav class="nav">
       <ul>
         <li><router-link to="/" :class="{ active: $route.path === '/' }">首页</router-link></li>
-        <li><router-link to="/bars" :class="{ active: $route.path === '/bars' }">帖吧</router-link></li>
-        <li><router-link to="/ranking" :class="{ active: $route.path === '/ranking' }">排行榜</router-link></li>
-        <li><router-link to="/history" :class="{ active: $route.path === '/history' }">浏览历史</router-link></li>
-        <li><router-link to="/messages" :class="{ active: $route.path === '/messages' }">消息</router-link></li>
+<!--        <li><router-link to="/bars" :class="{ active: $route.path === '/bars' }">帖吧</router-link></li>-->
+<!--        <li><router-link to="/ranking" :class="{ active: $route.path === '/ranking' }">排行榜</router-link></li>-->
+<!--        <li><router-link to="/history" :class="{ active: $route.path === '/history' }">浏览历史</router-link></li>-->
+<!--        <li><router-link to="/messages" :class="{ active: $route.path === '/messages' }">消息</router-link></li>-->
       </ul>
     </nav>
 
@@ -182,7 +182,7 @@ const handleCreatePost = () => {
 .search-box:focus-within {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(94, 129, 255, 0.1);
-  width: 300px;
+  width: 600px;
 }
 .search-icon {
   color: var(--text-secondary);

@@ -150,7 +150,7 @@ const myBars = computed(() => {
 /* 移动端切换按钮 */
 .sidebar-toggle {
   display: none;
-  position: fixed; top: 100px; left: 10px; z-index: 110;
+  position: fixed; top: 180px; left: -15px; z-index: 110;
   width: 36px; height: 36px; border-radius: 50%;
   background: var(--primary-color); border: none; color: white;
   font-size: 1rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
