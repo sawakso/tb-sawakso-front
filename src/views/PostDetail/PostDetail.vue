@@ -267,8 +267,10 @@ const parsedMedia = computed(() => {
 
 const mediaImages = computed(() => parsedMedia.value.images)
 const mediaVideo = computed(() => parsedMedia.value.video)
+
+// 宽松判断：只要 media_url 有内容就显示（不依赖 media_type 字段）
 const hasMedia = computed(() =>
-  post.value?.media_type && (mediaImages.value.length > 0 || mediaVideo.value)
+  (mediaImages.value.length > 0 || mediaVideo.value) && post.value?.media_url
 )
 
 // ====== 灯箱操作 ======

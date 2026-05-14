@@ -576,6 +576,10 @@ const handleSubmit = async () => {
     const imageResults = uploadResults.filter(r => r.data?.type === 'image')
     const videoResult = uploadResults.find(r => r.data?.type === 'video')
 
+    console.log('[CreatePost] 原始上传结果:', JSON.stringify(uploadResults))
+    console.log('[CreatePost] imageResults:', JSON.stringify(imageResults))
+    console.log('[CreatePost] videoResult:', videoResult ? JSON.stringify(videoResult.data) : 'none')
+
     const updatePayload = {}
 
     if (imageResults.length > 0) {
@@ -595,13 +599,18 @@ const handleSubmit = async () => {
       }
     }
 
+    console.log('[CreatePost] 最终 updatePayload:', JSON.stringify(updatePayload))
+
     // 更新帖子（如果有媒体文件）
     if (Object.keys(updatePayload).length > 0) {
       try {
-        await postsApi.update(postId, updatePayload)
+        const updateRes = await postsApi.update(postId, updatePayload)
+        console.log('[CreatePost] ✅ 帖子媒体更新成功! 返回:', JSON.stringify(updateRes))
       } catch (updateErr) {
-        console.error('更新帖子媒体失败:', updateErr)
-        // 不阻塞流程，帖子已创建成功
+        console.error('[CreatePost] ❌ 更新帖子媒体失败!', updateErr)
+        console.error('[CreatePost] ❌ 错误状态码:', updateErr.response?.status)
+        console.error('[CreatePost] ❌ 错误响应体:', JSON.stringify(updateErr.response?.data))
+        alert(`⚠️ 帖子已发布，但媒体信息更新失败:\n状态码: ${updateErr.response?.status || '未知'}\n原因: ${updateErr.response?.data?.message || updateErr.message || '未知错误'}`)
       }
     }
 
