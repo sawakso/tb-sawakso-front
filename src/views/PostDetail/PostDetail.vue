@@ -95,6 +95,13 @@
           </button>
         </div>
       </article>
+      <!-- ✅ 添加这行：帖子不存在时 -->
+      <div v-else-if="postLoaded" class="post-not-found">
+        <i class="fas fa-trash-alt"></i>
+        <h2>帖子不存在</h2>
+        <p>该帖子可能已被删除或链接无效</p>
+        <router-link to="/" class="btn-home">返回首页</router-link>
+      </div>
 
       <!-- 评论区 -->
       <CommentList v-if="post" :postId="post.id" ref="commentListRef" @needLogin="showAuth = true" />
@@ -185,61 +192,69 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import Sidebar from '@/components/Sidebar/Sidebar.vue'
-import BarCard from '@/components/BarCard/BarCard.vue'
-import CommentList from '@/components/CommentList/CommentList.vue'
-import { useUser } from '@/composables/useUser'
-import { useUserStore } from '@/stores/user'
-import { barsApi } from '@/request/api/bars.js'
-import { postsApi } from '@/request/api/posts.js'
-import { reactionsApi } from '@/request/api/reactions.js'
+  import { computed, ref, onMounted, onUnmounted } from 'vue'
+  import { useRoute, useRouter } from 'vue-router'  // ← 加上 useRouter
+  import Sidebar from '@/components/Sidebar/Sidebar.vue'
+  import BarCard from '@/components/BarCard/BarCard.vue'
+  import CommentList from '@/components/CommentList/CommentList.vue'
+  import { useUser } from '@/composables/useUser'
+  import { useUserStore } from '@/stores/user'
+  import { barsApi } from '@/request/api/bars.js'
+  import { postsApi } from '@/request/api/posts.js'
+  import { reactionsApi } from '@/request/api/reactions.js'
 
-const route = useRoute()
-const { user } = useUser()
-const userStore = useUserStore()
-const title = import.meta.env.VITE_APP_TITLE
-const showAuth = ref(false)
-const post = ref(null)
-const relatedPosts = ref([])
-const allBars = ref([])
-const videoRef = ref(null)
+  const route = useRoute()
+  const router = useRouter()  // ← 加上这行
+  const { user } = useUser()
+  const userStore = useUserStore()
+  const title = import.meta.env.VITE_APP_TITLE
+  const showAuth = ref(false)
+  const post = ref(null)
+  const postLoaded = ref(false)
+  const relatedPosts = ref([])
+  const allBars = ref([])
+  const videoRef = ref(null)
 
-// 评论组件引用
-const commentListRef = ref(null)
+  // 评论组件引用
+  const commentListRef = ref(null)
 
-// ====== 灯箱状态 ======
-const lightboxVisible = ref(false)
-const lightboxIndex = ref(0)
+  // ====== 灯箱状态 ======
+  const lightboxVisible = ref(false)
+  const lightboxIndex = ref(0)
 
-const currentBar = computed(() => {
+  const currentBar = computed(() => {
   if (!post.value) return null
   return allBars.value.find(b => b.id === post.value.bar_id)
 })
 
-// 是否可删除帖子（登录 + 是作者/吧主/管理员）
-const canDeletePost = computed(() => {
+  // 是否可删除帖子（作者或管理员）
+  const canDeletePost = computed(() => {
   if (!user.value || !post.value) return false
-  // 吧主判断
-  const bar = currentBar.value
-  const isBarOwner = bar && Number(bar.creator_id) === user.value.id
-  // 管理员判断（role 字段从用户 store 获取）
   const currentUser = userStore.getUser(user.value.id)
   const isAdmin = currentUser?.role === 'ADMIN'
-  return Number(post.value.user_id) === user.value.id || isBarOwner || isAdmin
+  return Number(post.value.user_id) === user.value.id || isAdmin
 })
 
-onMounted(async () => {
-  post.value = await postsApi.getById(route.params.id)
-  // 将帖子作者信息存入用户缓存池
-  userStore.extractAndCacheUsers(post.value)
-  const allBarPosts = await postsApi.getAll({ barId: post.value.bar_id })
-  // 相关帖子的用户信息也缓存
-  userStore.extractAndCacheUsers(allBarPosts)
-  relatedPosts.value = allBarPosts.filter(p => p.id !== post.value.id).slice(0, 5)
-  allBars.value = await barsApi.getAll()
-})
+
+
+  onMounted(async () => {
+    try {
+      post.value = await postsApi.getById(route.params.id)
+      if (!post.value || post.value.error) {
+        post.value = null
+      } else {
+        userStore.extractAndCacheUsers(post.value)
+        const allBarPosts = await postsApi.getAll({ barId: post.value.bar_id })
+        userStore.extractAndCacheUsers(allBarPosts)
+        relatedPosts.value = allBarPosts.filter(p => p.id !== post.value.id).slice(0, 5)
+        allBars.value = await barsApi.getAll()
+      }
+    } catch (e) {
+      post.value = null
+    } finally {
+      postLoaded.value = true  // ← 标记加载完成
+    }
+  })
 
 const authorName = computed(() => {
   if (!post.value) return ''
@@ -826,5 +841,31 @@ const handleDeletePost = async () => {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.post-not-found {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-secondary);
+}
+.post-not-found i {
+  font-size: 4rem;
+  color: var(--border-color);
+  margin-bottom: 20px;
+}
+.post-not-found h2 {
+  font-size: 1.5rem;
+  color: var(--text-color);
+  margin-bottom: 12px;
+}
+.post-not-found p {
+  margin-bottom: 24px;
+}
+.btn-home {
+  display: inline-block;
+  padding: 10px 24px;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 20px;
+  text-decoration: none;
 }
 </style>

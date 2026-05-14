@@ -26,6 +26,7 @@
           :allComments="commentList"
           :activeReplyId="activeReplyId"
           :currentUserId="currentUserId"
+          :children="getChildren(comment.id)"
           @react="handleReact"
           @reply="handleReply"
           @toggleReply="handleToggleReply"
@@ -135,17 +136,39 @@ const handleReply = async (targetComment, content) => {
 const handleReact = async (commentId, type) => {
   if (!user.value) return
 
+  // 找到对应评论
+  const comment = commentsData.value.find(c => c.id === commentId)
+  if (!comment) return
+
   try {
-    await reactionsApi.toggle({
+    const res = await reactionsApi.toggle({
       target_type: 'comment',
       target_id: commentId,
       reaction_type: type
     })
-    // 刷新评论列表以获取最新计数
-    await fetchComments()
+
+    // ✅ 根据 type 确定计数字段
+    const countField = type === 'like' ? 'like_count'
+        : type === 'dislike' ? 'dislike_count'
+            : 'question_count'
+
+    if (res.action === 'added') {
+      comment.myReaction = type
+      comment[countField] = (comment[countField] || 0) + 1
+    } else if (res.action === 'removed') {
+      comment.myReaction = null
+      comment[countField] = Math.max((comment[countField] || 0) - 1, 0)
+    } else if (res.action === 'switched') {
+      comment.myReaction = type
+      comment[countField] = (comment[countField] || 0) + 1
+    }
   } catch (e) {
     console.error('态度操作失败:', e)
   }
+}
+// 获取子评论
+const getChildren = (parentId) => {
+  return commentsData.value.filter(c => c.parent_id === parentId)
 }
 
 const handleToggleReply = (commentId) => {

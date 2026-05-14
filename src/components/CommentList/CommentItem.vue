@@ -57,12 +57,15 @@
             v-for="child in children"
             :key="child.id"
             :comment="child"
-            :replyToUser="getUsername(child.reply_to)"
-            :children="getChildren(child.id)"
             :allComments="allComments"
+            :activeReplyId="activeReplyId"
+            :currentUserId="currentUserId"
+            :children="getChildren(child.id)"
+            :replyToUser="getUsername(child.reply_to)"
             isReply
             @react="(id, type) => emit('react', id, type)"
             @reply="(c, content) => emit('reply', c, content)"
+            @toggleReply="(id) => emit('toggleReply', id)"
         />
       </div>
 
@@ -127,6 +130,7 @@ const getUsername = (userId) => {
   return target?.nickname || target?.username || `用户${userId}`
 }
 
+// 获取子评论
 const getChildren = (parentId) => {
   if (!props.allComments) return []
   return props.allComments.filter(c => c.parent_id === parentId)

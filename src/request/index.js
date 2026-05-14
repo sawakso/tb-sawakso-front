@@ -18,14 +18,15 @@ request.interceptors.request.use(config => {
     // 详细调试
     console.log('[Debug] config.url 原始值:', config.url)
     console.log('[Debug] config.url 类型:', typeof config.url)
-    console.log('[Debug] 是否是 /upload:', config.url === '/upload')
-    console.log('[Debug] startsWith /upload:', config.url?.startsWith('/upload'))
 
     // 确保 URL 是字符串类型
     const url = String(config.url || '')
 
-    // 动态 baseURL
-    if (url.startsWith('/bars') || url.startsWith('/posts') || url === '/upload' || url.startsWith('/upload')) {
+    // ✅ 所有走 tb-api 的路径
+    const tbApiPaths = ['/bars', '/posts', '/upload', '/reactions', '/comments', '/user']
+    const needsTbApi = tbApiPaths.some(path => url.startsWith(path))
+
+    if (needsTbApi) {
         config.baseURL = 'https://tb-api.sawakso.com/api'
     } else {
         config.baseURL = 'https://api.sawakso.com'
