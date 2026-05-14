@@ -26,14 +26,16 @@
           <img :src="mediaImages[0]" :alt="post.title" @error="handleImgError" />
         </div>
 
-        <!-- 视频 - 直接用 video 的 poster 属性，或显示视频本身 -->
+        <!-- 视频 -->
         <div v-else-if="mediaVideo" class="media-video" :style="{ aspectRatio: mediaRatio }">
           <video
+              ref="videoRef"
               :src="mediaVideo"
               muted
               preload="metadata"
               :poster="mediaImages[0] || ''"
               class="video-player"
+              @loadedmetadata="seekToMiddle"
           ></video>
           <div class="video-play"><i class="fas fa-play-circle"></i></div>
           <span v-if="mediaImages.length > 0" class="video-badge">
@@ -69,7 +71,13 @@ defineEmits(['click', 'delete'])
 
 const userStore = useUserStore()
 const { user } = useUser()
+const videoRef = ref(null)
 
+const seekToMiddle = () => {
+  const video = videoRef.value
+  if (!video) return
+  video.currentTime = video.duration / 2
+}
 const avatar = computed(() => {
   const u = userStore.getUser(props.post.user_id)
   return u?.avatar || '/images/default-avatar.png'
