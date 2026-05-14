@@ -274,26 +274,33 @@ const barName = computed(() => {
 })
 
 // ====== 多图/视频 URL 解析 ======
-// media_url 新格式: "url1,url2,url3" (纯图片) 或 "url1,url2|videoUrl" (图+视频)
 const parsedMedia = computed(() => {
-  if (!post.value?.media_url) return { images: [], video: null }
-  const url = post.value.media_url
+    if (!post.value?.media_url) return { images: [], video: null }
+    const url = post.value.media_url
+    const type = post.value.media_type
 
-  // 含 | 表示有视频
-  if (url.includes('|')) {
-    const parts = url.split('|')
-    return {
-      images: parts[0] ? parts[0].split(',').filter(Boolean) : [],
-      video: parts[1] || null
+    // 纯视频
+    if (type === 'video' && !url.includes(',') && !url.includes('|')) {
+      return { images: [], video: url }
     }
-  }
-  // 纯逗号分隔 = 多图
-  if (url.includes(',')) {
-    return { images: url.split(',').filter(Boolean), video: null }
-  }
-  // 单 URL（旧格式）
-  return { images: [url], video: null }
-})
+
+    // 含 | 表示有视频（图+视频）
+    if (url.includes('|')) {
+      const parts = url.split('|')
+      return {
+        images: parts[0] ? parts[0].split(',').filter(Boolean) : [],
+        video: parts[1] || null
+      }
+    }
+
+    // 纯逗号分隔 = 多图
+    if (url.includes(',')) {
+      return { images: url.split(',').filter(Boolean), video: null }
+    }
+
+    // 单个图片
+    return { images: [url], video: null }
+  })
 
 const mediaImages = computed(() => parsedMedia.value.images)
 const mediaVideo = computed(() => parsedMedia.value.video)
