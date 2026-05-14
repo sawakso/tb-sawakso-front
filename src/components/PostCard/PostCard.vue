@@ -9,20 +9,33 @@
     <div class="post-body">
       <h3 class="post-title">{{ post.title }}</h3>
 
-      <div class="post-media" v-if="firstMediaUrl">
-        <div v-if="isMediaType('image')" class="media-image" :style="{ aspectRatio: mediaRatio }">
-          <img :src="firstMediaUrl" :alt="post.title" @error="handleImgError" />
+      <!-- 媒体内容：图片 / 视频 / 多图 -->
+      <div class="post-media" v-if="hasMedia">
+        <!-- 多图网格 -->
+        <div v-if="mediaImages.length > 1" class="media-grid" :class="'grid-' + Math.min(mediaImages.length, 4)">
+          <div v-for="(url, idx) in displayedImages" :key="'img-' + idx" class="grid-item">
+            <img :src="url" :alt="post.title + ' 图' + (idx + 1)" loading="lazy" @error="handleImgError" />
+          </div>
+          <!-- 超出部分显示数量 -->
+          <div v-if="mediaImages.length > 4" class="grid-item grid-more">
+            <span>+{{ mediaImages.length - 4 }}</span>
+          </div>
         </div>
-        <div v-else-if="isMediaType('video')" class="media-video" :style="{ aspectRatio: mediaRatio }">
-          <video :src="firstVideoUrl || firstMediaUrl" muted preload="metadata"></video>
+
+        <!-- 单图 -->
+        <div v-else-if="mediaImages.length === 1" class="media-image" :style="{ aspectRatio: mediaRatio }">
+          <img :src="mediaImages[0]" :alt="post.title" @error="handleImgError" />
+        </div>
+
+        <!-- 视频（无图或图+视频时优先展示视频封面） -->
+        <div v-else-if="mediaVideo" class="media-video" :style="{ aspectRatio: mediaRatio }">
+          <video :src="mediaVideo" muted preload="metadata"></video>
           <div class="video-play"><i class="fas fa-play-circle"></i></div>
-        </div>
-        <div v-else-if="post.media_type === 'link'" class="media-link">
-          <i class="fas fa-link"></i>
-          <span>{{ post.media_url }}</span>
+          <span v-if="mediaImages.length > 0" class="video-badge"><i class="fas fa-images"></i> {{ mediaImages.length }}</span>
         </div>
       </div>
 
+      <!-- 无媒体时显示文字摘要 -->
       <p v-else class="post-excerpt">{{ excerpt }}</p>
     </div>
 
@@ -64,7 +77,7 @@ const barName = computed(() => {
 })
 
 // ====== 多图/视频 URL 解析 ======
-// media_url 新格式: "url1,url2,url3" (纯图片) 或 "url1,url2,url3|videoUrl" (图+视频)
+// media_url 新格式: "url1,url2,url3" (纯图片) 或 "url1,url2|videoUrl" (图+视频)
 // 旧格式: "single_url"
 const parsedMedia = computed(() => {
   const url = props.post.media_url
@@ -90,24 +103,24 @@ const parsedMedia = computed(() => {
   return { images: [url], video: null }
 })
 
-const firstMediaUrl = computed(() => {
-  return parsedMedia.value.images[0] || parsedMedia.value.video || ''
-})
+const mediaImages = computed(() => parsedMedia.value.images)
+const mediaVideo = computed(() => parsedMedia.value.video)
 
-const firstVideoUrl = computed(() => {
-  return parsedMedia.value.video || null
-})
+// 卡片最多显示 4 张图
+const displayedImages = computed(() => mediaImages.value.slice(0, 4))
 
-// 判断当前展示的主要媒体类型
-const isMediaType = (type) => {
-  if (type === 'video') {
-    return props.post.media_type === 'video' && !!parsedMedia.value.video
-  }
-  if (type === 'image') {
-    return props.post.media_type === 'image' && parsedMedia.value.images.length > 0
-  }
-  return false
-}
+// 是否有媒体内容（宽松判断：有图或有视频都算）
+const hasMedia = computed(() => mediaImages.value.length > 0 || mediaVideo.value)
+
+// 帖子主要类型（用于确定卡片展示优先级）
+// 有视频 → 展示视频封面；有多图 → 展示图片网格；单图 → 展示大图
+const primaryType = computed(() => {
+  if (mediaVideo.value && mediaImages.value.length === 0) return 'video-only'
+  if (mediaVideo.value && mediaImages.value.length > 0) return 'mixed'
+  if (mediaImages.value.length > 1) return 'multi-image'
+  if (mediaImages.value.length === 1) return 'single-image'
+  return null
+})
 
 const mediaRatio = computed(() => {
   const w = props.post.media_width
@@ -166,24 +179,97 @@ const handleImgError = (e) => {
   margin-bottom: 10px; line-height: 1.4;
 }
 .post-excerpt { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; }
+
+/* ====== 媒体区域通用 ====== */
+.post-media {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* ====== 单图 ====== */
 .media-image {
-  margin-bottom: 12px; border-radius: 8px; overflow: hidden;
-  background: #1a1a2e; max-height: 300px;
-  display: flex; align-items: center; justify-content: center;
+  background: #1a1a2e;
+  max-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .media-image img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ====== 视频预览 ====== */
 .media-video {
-  position: relative; margin-bottom: 12px; border-radius: 8px; overflow: hidden;
-  background: #000; max-height: 300px;
-  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  background: #000;
+  max-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .media-video video { width: 100%; height: 100%; object-fit: cover; }
 .video-play {
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 3rem; color: white; opacity: 0.8;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  font-size: 3rem; color: white; opacity: 0.85;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  transition: opacity 0.2s;
 }
+.post-card:hover .video-play { opacity: 1; }
+.video-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.65);
+  color: white;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+}
+.video-badge i { margin-right: 3px; }
+
+/* ====== 多图网格 ====== */
+.media-grid {
+  display: grid;
+  gap: 3px;
+  background: #1a1a2e;
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 280px;
+}
+
+/* 网格布局：根据图片数量决定排列方式 */
+.grid-2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+.grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.grid-3 .grid-item:first-child { grid-row: span 2; }
+.grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+.grid-item {
+  position: relative;
+  overflow: hidden;
+  background: #111;
+  min-height: 80px;
+}
+.grid-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s;
+}
+.grid-item:hover img { transform: scale(1.05); }
+
+.grid-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.65);
+  color: white;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+/* 链接类型 */
 .media-link {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 14px; background: var(--surface-color);
@@ -191,6 +277,7 @@ const handleImgError = (e) => {
   margin-bottom: 12px; font-size: 0.85rem; color: var(--primary-color); overflow: hidden;
 }
 .media-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .post-meta {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   font-size: 0.82rem; color: var(--text-secondary);

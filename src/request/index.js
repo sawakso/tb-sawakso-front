@@ -13,16 +13,24 @@ const CACHE_TIME = 5 * 60 * 1000
 const pending = new Map()
 
 // 请求拦截器
+// src/request/index.js
 request.interceptors.request.use(config => {
-    // ✅ 更健壮的匹配方式
-    const url = config.url || ''
+    // 详细调试
+    console.log('[Debug] config.url 原始值:', config.url)
+    console.log('[Debug] config.url 类型:', typeof config.url)
+    console.log('[Debug] 是否是 /upload:', config.url === '/upload')
+    console.log('[Debug] startsWith /upload:', config.url?.startsWith('/upload'))
 
-    // 检查是否是贴吧/帖子/上传相关接口
-    if (url.includes('/bars') || url.includes('/posts') || url.includes('/upload')) {
+    // 确保 URL 是字符串类型
+    const url = String(config.url || '')
+
+    // 动态 baseURL
+    if (url.startsWith('/bars') || url.startsWith('/posts') || url === '/upload' || url.startsWith('/upload')) {
         config.baseURL = 'https://tb-api.sawakso.com/api'
     } else {
         config.baseURL = 'https://api.sawakso.com'
     }
+
     console.log(`[Request] ${config.method?.toUpperCase()} ${config.url} → baseURL: ${config.baseURL}`)
 
     // 1. GET 请求走缓存

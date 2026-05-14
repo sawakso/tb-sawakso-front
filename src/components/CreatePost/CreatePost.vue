@@ -102,7 +102,7 @@
             >
               <i class="fas fa-video"></i> {{ videoFile ? '已添加视频' : '添加视频' }}
             </button>
-            <span class="upload-hint">图片最多 3 张（单张 ≤5MB），视频 1 个（≤50MB）</span>
+            <span class="upload-hint">图片最多 3 张（单张 ≤10MB），视频 1 个（≤10MB）</span>
           </div>
 
           <!-- 隐藏的文件输入框 -->
@@ -444,9 +444,9 @@ const handleImageSelect = (e) => {
 
   for (let i = 0; i < Math.min(files.length, remaining); i++) {
     const file = files[i]
-    // 校验大小：5MB
-    if (file.size > 5 * 1024 * 1024) {
-      alert(`图片 "${file.name}" 超过 5MB 限制`)
+    // 校验大小：10MB（与后端一致）
+    if (file.size > 10 * 1024 * 1024) {
+      alert(`图片 "${file.name}" 超过 10MB 限制`)
       continue
     }
     images.value.push({
@@ -464,8 +464,8 @@ const handleVideoSelect = (e) => {
   const file = e.target.files?.[0]
   if (!file) return
 
-  if (file.size > 50 * 1024 * 1024) {
-    alert('视频不能超过 50MB')
+  if (file.size > 10 * 1024 * 1024) {
+    alert('视频不能超过 10MB')
     e.target.value = ''
     return
   }
@@ -522,27 +522,34 @@ const close = () => {
   showCreateBarModal.value = false
   emit('close')
 }
-
 const handleSubmit = async () => {
   if (!canSubmit.value || submitting.value) return
 
   submitting.value = true
 
   try {
-    let payload = {
+    // ========== 第一步：先创建帖子（不包含媒体） ==========
+    const postPayload = {
       title: form.value.title.trim(),
       content: form.value.content.trim(),
       bar_id: Number(form.value.bar_id)
     }
 
-    // ===== 先并行上传媒体到 R2 =====
+    const postResult = await postsApi.create(postPayload)
+    const postId = postResult.data?.id || postResult.id
+
+    if (!postId) {
+      throw new Error('创建帖子失败，未获取到帖子ID')
+    }
+
+    // ========== 第二步：上传所有媒体文件（带上 postId） ==========
     const uploadTasks = []
 
     for (const img of images.value) {
-      uploadTasks.push(postsApi.uploadMedia(img.file))
+      uploadTasks.push(uploadWithPostId(img.file, postId))
     }
     if (videoFile.value) {
-      uploadTasks.push(postsApi.uploadMedia(videoFile.value))
+      uploadTasks.push(uploadWithPostId(videoFile.value, postId))
     }
 
     let uploadResults = []
@@ -552,40 +559,59 @@ const handleSubmit = async () => {
         uploadResults = await Promise.all(uploadTasks)
       } catch (e) {
         console.error('媒体上传失败:', e)
-        console.error('完整错误:', JSON.stringify({
-          status: e.response?.status,
-          statusText: e.response?.statusText,
-          url: e.config?.baseURL + e.config?.url,
-          data: e.response?.data
-        }))
-        alert(`上传失败(${e.response?.status || '未知'}): ${e.response?.statusText || e.message || '网络异常'}`)
+        // 上传失败时删除已创建的帖子
+        try {
+          await postsApi.delete(postId)
+        } catch (deleteErr) {
+          console.error('清理帖子失败:', deleteErr)
+        }
+        alert(`上传失败: ${e.response?.data?.message || e.message || '网络异常'}`)
         return
       } finally {
         uploading.value = false
       }
     }
 
-    // ===== 组装媒体字段 =====
+    // ========== 第三步：组装媒体数据并更新帖子 ==========
     const imageResults = uploadResults.filter(r => r.data?.type === 'image')
     const videoResult = uploadResults.find(r => r.data?.type === 'video')
 
+    const updatePayload = {}
+
     if (imageResults.length > 0) {
-      payload.images = JSON.stringify(imageResults.map(r => r.data.url))
-    }
-    if (videoResult) {
-      payload.video = videoResult.data.url
+      updatePayload.images = JSON.stringify(imageResults.map(r => r.data.url))
+      updatePayload.media_type = 'image'
+      updatePayload.media_url = imageResults.map(r => r.data.url).join(',')
     }
 
-    // 发送创建请求
-    const res = await postsApi.create(payload)
+    if (videoResult) {
+      updatePayload.video = videoResult.data.url
+      updatePayload.media_type = updatePayload.media_type === 'image' ? 'mixed' : 'video'
+      // 如果有图片也有视频，用 | 分隔
+      if (updatePayload.media_url) {
+        updatePayload.media_url += '|' + videoResult.data.url
+      } else {
+        updatePayload.media_url = videoResult.data.url
+      }
+    }
+
+    // 更新帖子（如果有媒体文件）
+    if (Object.keys(updatePayload).length > 0) {
+      try {
+        await postsApi.update(postId, updatePayload)
+      } catch (updateErr) {
+        console.error('更新帖子媒体失败:', updateErr)
+        // 不阻塞流程，帖子已创建成功
+      }
+    }
 
     // 清除帖子列表缓存
     request.clearCache('/posts')
 
-    emit('created', res.data)
-
+    emit('created', { id: postId, ...postPayload, ...updatePayload })
     close()
-    await router.push(`/post/${res.data.id}`)
+    await router.push(`/post/${postId}`)
+
   } catch (e) {
     console.error('发帖失败:', e)
     alert(e.response?.data?.message || '发布失败，请重试')
@@ -593,6 +619,13 @@ const handleSubmit = async () => {
     submitting.value = false
   }
 }
+
+// 辅助函数：上传文件并传入 postId
+const uploadWithPostId = (file, postId) => {
+  console.log('[Upload] 即将上传文件:', file.name, 'size:', file.size, 'postId:', postId)
+  return postsApi.uploadMedia(file, postId)
+}
+
 </script>
 
 <style scoped>
