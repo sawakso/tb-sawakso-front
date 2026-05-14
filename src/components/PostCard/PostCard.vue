@@ -41,9 +41,12 @@
 
     <div class="post-meta">
       <span class="meta-bar"><i class="fas fa-th-large"></i> {{ barName }}</span>
+      <span class="meta-item" :class="{ 'meta-liked': post.myReaction === 'like' }"><i :class="[post.myReaction === 'like' ? 'fas' : 'far', 'fa-heart']"></i> {{ post.like_count }}</span>
       <span class="meta-item"><i class="fas fa-eye"></i> {{ post.view_count }}</span>
-      <span class="meta-item"><i class="fas fa-heart"></i> {{ post.like_count }}</span>
       <span class="meta-item"><i class="fas fa-comment"></i> {{ post.comment_count }}</span>
+      <button v-if="canDelete" class="delete-btn" title="删除帖子" @click.stop="$emit('delete', post.id)">
+        <i class="fas fa-trash-alt"></i>
+      </button>
     </div>
   </article>
 </template>
@@ -51,11 +54,13 @@
 <script setup>
 import { computed } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { useUser } from '@/composables/useUser'
 
 const props = defineProps({ post: Object })
-defineEmits(['click'])
+defineEmits(['click', 'delete'])
 
 const userStore = useUserStore()
+const { user } = useUser()
 
 const avatar = computed(() => {
   const u = userStore.getUser(props.post.user_id)
@@ -111,6 +116,14 @@ const displayedImages = computed(() => mediaImages.value.slice(0, 4))
 
 // 是否有媒体内容（宽松判断：有图或有视频都算）
 const hasMedia = computed(() => mediaImages.value.length > 0 || mediaVideo.value)
+
+// 是否可删除（登录用户 + 是作者/管理员）
+const canDelete = computed(() => {
+  if (!user.value) return false
+  const currentUser = userStore.getUser(user.value.id)
+  const isAdmin = currentUser?.role === 'ADMIN'
+  return Number(props.post.user_id) === user.value.id || isAdmin
+})
 
 // 帖子主要类型（用于确定卡片展示优先级）
 // 有视频 → 展示视频封面；有多图 → 展示图片网格；单图 → 展示大图
@@ -286,4 +299,12 @@ const handleImgError = (e) => {
 .meta-bar { color: var(--primary-color); font-weight: 500; }
 .meta-item { display: flex; align-items: center; gap: 4px; }
 .meta-item i { font-size: 0.75rem; }
+.meta-liked { color: var(--secondary-color); }
+.delete-btn {
+  margin-left: auto;
+  background: none; border: none; color: var(--text-secondary);
+  cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  font-size: 0.8rem; transition: all 0.2s;
+}
+.delete-btn:hover { color: #ef4444; background: rgba(239,68,68,0.08); }
 </style>

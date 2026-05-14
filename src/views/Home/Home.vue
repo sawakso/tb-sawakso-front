@@ -11,6 +11,7 @@
           :key="post.id"
           :post="post"
           @click="goToPost(post.id)"
+          @delete="handleDeletePost"
       />
     </main>
     <RightSidebar />
@@ -44,6 +45,17 @@ const goToPost = (id) => router.push('/post/' + id)
 
 const handleCreatePost = () => {
   if (!user.value) { showAuth.value = true; return }
+}
+
+const handleDeletePost = async (postId) => {
+  if (!confirm('确定要删除这篇帖子吗？删除后无法恢复。')) return
+  try {
+    await postsApi.delete(postId)
+    posts.value = posts.value.filter(p => p.id !== postId)
+  } catch (e) {
+    console.error('删除失败:', e)
+    alert(e.response?.data?.message || '删除失败，请重试')
+  }
 }
 </script>
 

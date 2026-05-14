@@ -77,9 +77,13 @@
 
         <!-- 操作栏 -->
         <div class="post-actions">
-          <button class="action-btn" @click="handleLike">
-            <i :class="['fas', 'fa-heart', liked && 'liked']"></i>
-            <span>{{ post.like_count }}</span>
+          <button class="action-btn" :class="{ liked: post.myReaction === 'like' }" @click="handleLike">
+            <i :class="['fas', post.myReaction === 'like' ? 'fa-heart' : 'fa-heart-o']"></i>
+            <span>{{ post.like_count || 0 }}</span>
+          </button>
+          <button class="action-btn action-btn-danger" v-if="canDeletePost" @click="handleDeletePost">
+            <i class="fas fa-trash"></i>
+            <span>删除</span>
           </button>
           <button class="action-btn">
             <i class="fas fa-star"></i>
@@ -197,7 +201,6 @@ const { user } = useUser()
 const userStore = useUserStore()
 const title = import.meta.env.VITE_APP_TITLE
 const showAuth = ref(false)
-const liked = ref(false)
 const post = ref(null)
 const relatedPosts = ref([])
 const allBars = ref([])
@@ -213,6 +216,18 @@ const lightboxIndex = ref(0)
 const currentBar = computed(() => {
   if (!post.value) return null
   return allBars.value.find(b => b.id === post.value.bar_id)
+})
+
+// 是否可删除帖子（登录 + 是作者/吧主/管理员）
+const canDeletePost = computed(() => {
+  if (!user.value || !post.value) return false
+  // 吧主判断
+  const bar = currentBar.value
+  const isBarOwner = bar && Number(bar.creator_id) === user.value.id
+  // 管理员判断（role 字段从用户 store 获取）
+  const currentUser = userStore.getUser(user.value.id)
+  const isAdmin = currentUser?.role === 'ADMIN'
+  return Number(post.value.user_id) === user.value.id || isBarOwner || isAdmin
 })
 
 onMounted(async () => {
@@ -335,16 +350,34 @@ const handleLike = async () => {
       target_id: post.value.id,
       reaction_type: 'like'
     })
-    // 更新本地状态和计数
-    if (res.action === 'removed' || (res.action && res.action !== 'added' && res.action !== 'switched')) {
-      liked.value = false
+    // 根据返回的 action 更新状态
+    if (res.action === 'removed') {
+      // 取消点赞
+      post.value.myReaction = null
       post.value.like_count = Math.max((post.value.like_count || 0) - 1, 0)
+    } else if (res.action === 'switched') {
+      // 从其他态度切换为点赞（like_count +1，原态度 count -1 由后端处理）
+      post.value.myReaction = 'like'
+      post.value.like_count = (post.value.like_count || 0) + 1
     } else {
-      liked.value = true
+      // 新增点赞
+      post.value.myReaction = 'like'
       post.value.like_count = (post.value.like_count || 0) + 1
     }
   } catch (e) {
     console.error('点赞失败:', e)
+  }
+}
+
+const handleDeletePost = async () => {
+  if (!confirm('确定要删除这篇帖子吗？删除后无法恢复。')) return
+  try {
+    await postsApi.delete(post.value.id)
+    alert('帖子已删除')
+    router.push('/')
+  } catch (e) {
+    console.error('删除失败:', e)
+    alert(e.response?.data?.message || '删除失败，请重试')
   }
 }
 </script>
@@ -599,7 +632,9 @@ const handleLike = async () => {
   transition: var(--transition);
 }
 .action-btn:hover { border-color: var(--primary-color); color: var(--text-color); }
-.liked { color: var(--secondary-color); }
+.liked, .action-btn.liked { color: var(--secondary-color) !important; border-color: var(--secondary-color); }
+.action-btn-danger { color: #ef4444; border-color: transparent; background: rgba(239, 68, 68, 0.06); }
+.action-btn-danger:hover { border-color: #ef4444; background: rgba(239, 68, 68, 0.12); }
 
 /* 右侧边栏 */
 .right-sidebar {

@@ -37,6 +37,7 @@
             :key="post.id"
             :post="post"
             @click="$router.push('/post/' + post.id)"
+            @delete="handleDeletePost"
         />
       </div>
       <p v-if="sortedPosts.length === 0" class="no-posts">暂无帖子</p>
@@ -136,6 +137,17 @@ const toggleJoin = async () => {
     }
   } catch (e) {
     console.error('关注操作失败:', e)
+  }
+}
+
+const handleDeletePost = async (postId) => {
+  if (!confirm('确定要删除这篇帖子吗？删除后无法恢复。')) return
+  try {
+    await postsApi.delete(postId)
+    barPosts.value = barPosts.value.filter(p => p.id !== postId)
+  } catch (e) {
+    console.error('删除失败:', e)
+    alert(e.response?.data?.message || '删除失败，请重试')
   }
 }
 </script>
