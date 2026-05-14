@@ -14,8 +14,11 @@ const pending = new Map()
 
 // 请求拦截器
 request.interceptors.request.use(config => {
-    // 动态 baseURL：贴吧/帖子/上传接口走 tb-api 后端
-    if (config.url?.startsWith('/bars') || config.url?.startsWith('/posts') || config.url?.startsWith('/api/upload')) {
+    // ✅ 更健壮的匹配方式
+    const url = config.url || ''
+
+    // 检查是否是贴吧/帖子/上传相关接口
+    if (url.includes('/bars') || url.includes('/posts') || url.includes('/upload')) {
         config.baseURL = 'https://tb-api.sawakso.com/api'
     } else {
         config.baseURL = 'https://api.sawakso.com'
