@@ -14,12 +14,13 @@ const pending = new Map()
 
 // 请求拦截器
 request.interceptors.request.use(config => {
-    // 动态 baseURL：贴吧接口走新后端
-    if (config.url?.startsWith('/bars') || config.url?.startsWith('/posts')) {
+    // 动态 baseURL：贴吧/帖子/上传接口走 tb-api 后端
+    if (config.url?.startsWith('/bars') || config.url?.startsWith('/posts') || config.url?.startsWith('/api/upload')) {
         config.baseURL = 'https://tb-api.sawakso.com/api'
     } else {
         config.baseURL = 'https://api.sawakso.com'
     }
+    console.log(`[Request] ${config.method?.toUpperCase()} ${config.url} → baseURL: ${config.baseURL}`)
 
     // 1. GET 请求走缓存
     if (config.method === 'get') {

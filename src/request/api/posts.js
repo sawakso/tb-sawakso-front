@@ -22,9 +22,12 @@ export const postsApi = {
     uploadMedia(file) {
         const fd = new FormData()
         fd.append('file', file)
+        console.log('[Upload] 即将上传文件:', file.name, 'size:', file.size)
         return request.post('/api/upload', fd, {
-            baseURL: 'https://tb-api.sawakso.com/api',
             headers: { 'Content-Type': 'multipart/form-data' }
+        }).then(res => {
+            console.log('[Upload] 上传成功:', res.data?.url)
+            return res
         })
     }
 }

@@ -7,13 +7,57 @@
       </div>
 
       <div class="modal-body">
-        <!-- 选择贴吧 -->
-        <div class="form-group">
+        <!-- 搜索/选择贴吧 -->
+        <div class="form-group bar-select-wrapper">
           <label>选择贴吧</label>
-          <select v-model="form.bar_id" class="form-select">
-            <option value="" disabled>请选择贴吧</option>
-            <option v-for="bar in bars" :key="bar.id" :value="bar.id">{{ bar.name }}</option>
-          </select>
+          <div class="bar-search-box" ref="barSearchRef">
+            <input
+                v-model="barSearchKeyword"
+                type="text"
+                class="form-input bar-search-input"
+                placeholder="搜索贴吧或创建新贴吧..."
+                @input="handleBarSearch"
+                @focus="showBarDropdown = true"
+                @keydown.down.prevent="highlightNextBar"
+                @keydown.up.prevent="highlightPrevBar"
+                @keydown.enter.prevent="selectHighlightedBar"
+                @keydown.escape="showBarDropdown = false"
+            />
+            <!-- 下拉候选列表 -->
+            <div class="bar-dropdown" v-if="showBarDropdown">
+              <div v-if="barSearching" class="bar-dropdown-item bar-loading">搜索中...</div>
+              <template v-else>
+                <div
+                    v-for="(bar, idx) in filteredBars"
+                    :key="bar.id"
+                    class="bar-dropdown-item"
+                    :class="{ 'bar-highlighted': idx === barHighlightIndex }"
+                    @click="selectBar(bar)"
+                    @mousemove="barHighlightIndex = idx"
+                >
+                  <span class="bar-name">{{ bar.name }}</span>
+                  <span class="bar-meta" v-if="bar.post_count !== undefined">{{ bar.post_count }} 帖子</span>
+                </div>
+                <!-- 创建新贴吧 -->
+                <div
+                    v-if="barSearchKeyword.trim()"
+                    class="bar-dropdown-item bar-create-option"
+                    @click="showCreateBarModal = true; showBarDropdown = false"
+                >
+                  <i class="fas fa-plus-circle"></i>
+                  创建贴吧「{{ barSearchKeyword.trim() }}」
+                </div>
+                <div v-else-if="filteredBars.length === 0 && !barSearching" class="bar-dropdown-item bar-empty">
+                  无匹配结果，输入名称可创建新贴吧
+                </div>
+              </template>
+            </div>
+          </div>
+          <!-- 已选中的贴吧标签 -->
+          <div class="selected-bar-tag" v-if="form.bar_id && selectedBarName">
+            <span class="tag-text"><i class="fas fa-check-circle"></i> {{ selectedBarName }}</span>
+            <button class="tag-remove" @click="clearBarSelection" title="更换贴吧">&times;</button>
+          </div>
         </div>
 
         <!-- 标题 -->
@@ -132,11 +176,43 @@
         </button>
       </div>
     </div>
+
+    <!-- 创建贴吧内嵌弹窗 -->
+    <div class="modal-overlay create-bar-overlay" v-if="showCreateBarModal" @click.self="showCreateBarModal = false">
+      <div class="create-bar-modal">
+        <h4>创建新贴吧</h4>
+        <div class="create-bar-form">
+          <label>贴吧名称</label>
+          <input
+              v-model="newBarName"
+              type="text"
+              class="form-input"
+              placeholder="输入贴吧名称"
+              maxlength="30"
+              ref="newBarInputRef"
+          />
+          <label>简介（可选）</label>
+          <textarea
+              v-model="newBarDesc"
+              class="form-textarea"
+              placeholder="简单描述这个贴吧..."
+              rows="3"
+              maxlength="200"
+          ></textarea>
+        </div>
+        <div class="create-bar-actions">
+          <button class="btn-cancel" @click="showCreateBarModal = false">取消</button>
+          <button class="btn-submit" :disabled="!newBarName.trim() || creatingBar" @click="handleCreateBar">
+            {{ creatingBar ? '创建中...' : '确认创建' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { postsApi } from '@/request/api/posts.js'
 import { barsApi } from '@/request/api/bars.js'
@@ -152,7 +228,6 @@ const emit = defineEmits(['close', 'created'])
 const router = useRouter()
 const submitting = ref(false)
 const uploading = ref(false)
-const bars = ref([])
 
 // 表单数据
 const form = ref({
@@ -160,6 +235,177 @@ const form = ref({
   content: '',
   bar_id: props.defaultBarId || ''
 })
+
+// ========== 贴吧搜索/选择/创建 ==========
+const barSearchRef = ref(null)
+const barSearchKeyword = ref('')
+const filteredBars = ref([])
+const showBarDropdown = ref(false)
+const barSearching = ref(false)
+const barHighlightIndex = ref(-1)
+let searchTimer = null
+const allBarsCache = [] // 缓存全量列表用于本地过滤
+
+// 已选中的贴吧名称
+const selectedBarName = computed(() => {
+  if (!form.value.bar_id) return ''
+  const found = filteredBars.value.find(b => Number(b.id) === Number(form.value.bar_id))
+  if (found) return found.name
+  // 在缓存中找
+  const cached = allBarsCache.find(b => Number(b.id) === Number(form.value.bar_id))
+  return cached?.name || ''
+})
+
+// 加载热门贴吧（打开弹窗时）
+watch(() => props.visible, async (val) => {
+  if (val) {
+    // 如果有默认 barId，先获取名称
+    if (props.defaultBarId && !form.value.bar_id) {
+      form.value.bar_id = props.defaultBarId
+    }
+    // 预加载热门贴吧
+    try {
+      const list = await barsApi.search('')
+      filteredBars.value = Array.isArray(list) ? list : []
+      allBarsCache.push(...filteredBars.value)
+      // 如果有默认 barId，确保它在列表中以便显示名称
+      if (props.defaultBarId && !filteredBars.value.find(b => Number(b.id) === Number(props.defaultBarId))) {
+        try {
+          const barDetail = await barsApi.getById(props.defaultBarId)
+          if (barDetail) {
+            filteredBars.value.unshift(barDetail)
+            allBarsCache.push(barDetail)
+          }
+        } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      console.error('加载贴吧失败:', e)
+    }
+  }
+})
+
+// 搜索防抖
+const handleBarSearch = () => {
+  showBarDropdown.value = true
+  const q = barSearchKeyword.value.trim()
+  barHighlightIndex.value = -1
+
+  clearTimeout(searchTimer)
+  if (!q) {
+    // 无关键词 → 显示热门贴吧（从缓存取）
+    filteredBars.value = allBarsCache.slice(0, 20).sort((a, b) => (b.post_count || 0) - (a.post_count || 0))
+    barSearching.value = false
+    return
+  }
+
+  barSearching.value = true
+  searchTimer = setTimeout(async () => {
+    try {
+      const results = await barsApi.search(q)
+      filteredBars.value = Array.isArray(results) ? results : []
+      // 同时更新缓存
+      for (const b of filteredBars.value) {
+        if (!allBarsCache.find(c => c.id === b.id)) allBarsCache.push(b)
+      }
+    } catch (e) {
+      filteredBars.value = []
+    } finally {
+      barSearching.value = false
+    }
+  }, 300)
+}
+
+// 键盘导航
+const highlightNextBar = () => {
+  if (!showBarDropdown.value) { showBarDropdown.value = true; return }
+  const maxIdx = filteredBars.value.length - 1
+  barHighlightIndex.value = barHighlightIndex.value < maxIdx ? barHighlightIndex.value + 1 : maxIdx
+}
+const highlightPrevBar = () => {
+  if (!showBarDropdown.value) return
+  barHighlightIndex.value = barHighlightIndex.value > 0 ? barHighlightIndex.value - 1 : -1
+}
+
+const selectHighlightedBar = () => {
+  const idx = barHighlightIndex.value
+  if (idx >= 0 && idx < filteredBars.value.length) {
+    selectBar(filteredBars.value[idx])
+  }
+}
+
+// 选择一个贴吧
+const selectBar = (bar) => {
+  form.value.bar_id = bar.id
+  barSearchKeyword.value = bar.name
+  showBarDropdown.value = false
+  // 更新缓存
+  if (!allBarsCache.find(b => b.id === bar.id)) allBarsCache.push(bar)
+  if (!filteredBars.value.find(b => b.id === bar.id)) filteredBars.value.push(bar)
+}
+
+// 清除选择
+const clearBarSelection = () => {
+  form.value.bar_id = ''
+  barSearchKeyword.value = ''
+  nextTick(() => showBarDropdown.value = true)
+}
+
+// 点击外部关闭下拉
+const closeBarDropdown = (e) => {
+  if (barSearchRef.value && !barSearchRef.value.contains(e.target)) {
+    showBarDropdown.value = false
+  }
+}
+
+// 监听点击外部
+if (typeof window !== 'undefined') {
+  // 延迟绑定，避免 SSR 问题
+  setTimeout(() => {
+    document.addEventListener('click', closeBarDropdown)
+  }, 0)
+}
+
+// ========== 创建新贴吧 ==========
+const showCreateBarModal = ref(false)
+const newBarName = ref('')
+const newBarDesc = ref('')
+const newBarInputRef = ref(null)
+const creatingBar = ref(false)
+
+watch(showCreateBarModal, async (val) => {
+  if (val) {
+    newBarName.value = barSearchKeyword.value.trim()
+    newBarDesc.value = ''
+    await nextTick()
+    newBarInputRef.value?.focus()
+  }
+})
+
+const handleCreateBar = async () => {
+  const name = newBarName.value.trim()
+  if (!name) return
+
+  creatingBar.value = true
+  try {
+    const res = await barsApi.create({ name, description: newBarDesc.value.trim() })
+    const newBar = res.data || res
+
+    // 自动选中新创建的贴吧
+    selectBar(newBar)
+
+    // 插入到候选列表头部
+    filteredBars.value.unshift(newBar)
+    if (!allBarsCache.find(b => b.id === newBar.id)) allBarsCache.push(newBar)
+
+    showCreateBarModal.value = false
+    alert(`贴吧「${name}」创建成功！`)
+  } catch (e) {
+    console.error('创建贴吧失败:', e)
+    alert(e.response?.data?.message || '创建失败，请重试')
+  } finally {
+    creatingBar.value = false
+  }
+}
 
 // 媒体文件状态
 const images = ref([])       // [{ file: File, preview: string }]
@@ -169,16 +415,6 @@ const videoPreview = ref('')  // blob URL
 // 文件输入框引用
 const imageInputRef = ref(null)
 const videoInputRef = ref(null)
-
-// 加载贴吧列表
-watch(() => props.visible, async (val) => {
-  if (val && bars.value.length === 0) {
-    bars.value = await barsApi.getAll()
-  }
-  if (props.defaultBarId) {
-    form.value.bar_id = props.defaultBarId
-  }
-})
 
 const canSubmit = computed(() => {
   return form.value.title.trim() && form.value.content.trim() && form.value.bar_id
@@ -281,6 +517,9 @@ const close = () => {
   images.value = []
   videoFile.value = null
   videoPreview.value = ''
+  barSearchKeyword.value = ''
+  showBarDropdown.value = false
+  showCreateBarModal.value = false
   emit('close')
 }
 
@@ -313,7 +552,13 @@ const handleSubmit = async () => {
         uploadResults = await Promise.all(uploadTasks)
       } catch (e) {
         console.error('媒体上传失败:', e)
-        alert('媒体上传失败，请检查网络后重试')
+        console.error('完整错误:', JSON.stringify({
+          status: e.response?.status,
+          statusText: e.response?.statusText,
+          url: e.config?.baseURL + e.config?.url,
+          data: e.response?.data
+        }))
+        alert(`上传失败(${e.response?.status || '未知'}): ${e.response?.statusText || e.message || '网络异常'}`)
         return
       } finally {
         uploading.value = false
@@ -409,6 +654,112 @@ const handleSubmit = async () => {
   display: block; text-align: right;
   font-size: 0.78rem; color: var(--text-secondary);
   margin-top: 4px;
+}
+
+/* ====== 贴吧搜索选择器 ====== */
+.bar-select-wrapper { position: relative; margin-bottom: 16px; }
+.bar-search-box { position: relative; }
+.bar-search-input {
+  width: 100%; padding: 10px 14px;
+  background: var(--bg-color); border: 2px solid var(--border-color);
+  border-radius: 8px; color: var(--text-color);
+  font-size: 0.9rem; outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.bar-search-input:focus {
+  border-color: var(--primary-color);
+}
+/* 下拉候选 */
+.bar-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  margin-top: 4px;
+}
+.bar-dropdown-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; cursor: pointer;
+  transition: background 0.15s;
+  font-size: 0.88rem;
+  color: var(--text-color);
+}
+.bar-dropdown-item:hover,
+.bar-dropdown-item.bar-highlighted {
+  background: rgba(94, 129, 255, 0.08);
+}
+.bar-dropdown-item.bar-highlighted {
+  background: rgba(选中, 129, 255, 0.08); /* fallback */
+  background: rgba(94, 129, 255, 0.1);
+}
+.bar-name { font-weight: 500; }
+.bar-meta {
+  font-size: 0.75rem; color: var(--text-secondary);
+  flex-shrink: 0; margin-left: 8px;
+}
+.bar-loading,
+.bar-empty {
+  justify-content: center; color: var(--text-secondary);
+  font-size: 0.82rem; cursor: default;
+}
+.bar-loading:hover,
+.bar-empty:hover { background: transparent; }
+.bar-create-option {
+  color: var(--primary-color);
+  font-weight: 500;
+  border-top: 1px solid var(--border-color);
+  gap: 8px;
+}
+.bar-create-option i { font-size: 0.85rem; }
+.bar-create-option:hover {
+  background: rgba(94, 129, 255, 0.06);
+}
+/* 已选标签 */
+.selected-bar-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 8px; padding: 5px 12px;
+  background: rgba(94, 129, 255, 0.08);
+  border-radius: 16px; font-size: 0.85rem;
+  color: var(--primary-color);
+}
+.tag-text i { margin-right: 4px; }
+.tag-remove {
+  background: none; border: none; color: var(--text-secondary);
+  font-size: 1.1rem; cursor: pointer; line-height: 1;
+  padding: 0 2px;
+}
+.tag-remove:hover { color: #ef4444; }
+
+/* ====== 创建贴吧内嵌弹窗 ====== */
+.create-bar-overlay {
+  z-index: 1100;
+}
+.create-bar-modal {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  width: 420px; max-width: 90vw;
+  padding: 24px;
+}
+.create-bar-modal h4 {
+  margin: 0 0 16px; font-size: 1rem; color: var(--text-color);
+}
+.create-bar-form .form-group { margin-bottom: 14px; }
+.create-bar-form label {
+  display: block; font-size: 0.84rem; font-weight: 500;
+  color: var(--text-secondary); margin-bottom: 5px;
+}
+.create-bar-form .form-textarea { min-height: 60px; font-size: 0.85rem; }
+.create-bar-actions {
+  display: flex; justify-content: flex-end; gap: 10px;
+  margin-top: 18px;
 }
 
 /* ====== 媒体上传区域 ====== */
