@@ -23,9 +23,7 @@ export const postsApi = {
         const fd = new FormData()
         fd.append('file', file)
         console.log('[Upload] 即将上传文件:', file.name, 'size:', file.size)
-        return request.post('/api/upload', fd, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        }).then(res => {
+        return request.post('/upload', fd).then(res => {
             console.log('[Upload] 上传成功:', res.data?.url)
             return res
         })
