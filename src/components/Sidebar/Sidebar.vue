@@ -71,14 +71,23 @@ defineEmits(['openAuth'])
 
 const allBars = ref([])
 const stats = ref({ posts: 0, bars: 0, likes: 0 })
-const sidebarOpen = ref(true)
+const SIDEBAR_KEY = 'sidebar_open'
 const isMobile = ref(false)
+
+// 从 localStorage 读取上次状态，默认展开
+const savedState = localStorage.getItem(SIDEBAR_KEY)
+const sidebarOpen = ref(savedState !== null ? savedState === 'true' : true)
 
 // 检测移动端
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 768
-  if (isMobile.value) sidebarOpen.value = false
-  else sidebarOpen.value = true
+  if (isMobile.value) {
+    // 移动端强制关闭，不影响桌面端的持久化状态
+    sidebarOpen.value = false
+  } else if (savedState === null) {
+    // 首次访问桌面端，默认展开
+    sidebarOpen.value = true
+  }
 }
 
 onMounted(async () => {
@@ -109,6 +118,10 @@ onUnmounted(() => {
 
 const toggleSidebar = () => {
   sidebarOpen.value = !sidebarOpen.value
+  // 持久化到 localStorage（仅桌面端）
+  if (!isMobile.value) {
+    localStorage.setItem(SIDEBAR_KEY, String(sidebarOpen.value))
+  }
 }
 
 const closeSidebar = () => {
