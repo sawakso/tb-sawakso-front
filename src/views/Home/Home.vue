@@ -5,7 +5,7 @@
         :title="title"
         @openAuth="showAuth = true"
     />
-    <main class="main-content" :style="{ marginRight: rightbarOpen ? '260px' : '0' }">
+    <main class="main-content" ref="mainContentRef">
       <PostCard
           v-for="post in posts"
           :key="post.id"
@@ -14,12 +14,19 @@
           @delete="handleDeletePost"
       />
     </main>
-    <RightSidebar ref="rightbarRef" />
+    <RightSidebar />
+    <!-- 👇 加上登录弹窗 -->
+    <AuthModal
+        v-if="showAuth"
+        @close="showAuth = false"
+        @loginSuccess="showAuth = false"
+    />
   </div>
+
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import PostCard from '@/components/PostCard/PostCard.vue'
@@ -27,7 +34,7 @@ import RightSidebar from '@/components/RightSidebar/RightSidebar.vue'
 import { useUser } from '@/composables/useUser'
 import { useUserStore } from '@/stores/user'
 import { postsApi } from '@/request/api/posts.js'
-
+import AuthModal from "@/components/AuthModal/AuthModal.vue";
 
 const router = useRouter()
 const { user } = useUser()
@@ -35,13 +42,6 @@ const userStore = useUserStore()
 const title = import.meta.env.VITE_APP_TITLE
 const showAuth = ref(false)
 const posts = ref([])
-const rightbarRef = ref(null)
-const rightbarOpen = ref(true)
-
-// 监听右侧边栏状态
-watch(() => rightbarRef.value?.rightbarOpen, (val) => {
-  if (val !== undefined) rightbarOpen.value = val
-})
 
 onMounted(async () => {
   posts.value = await postsApi.getAll()
@@ -49,10 +49,6 @@ onMounted(async () => {
 })
 
 const goToPost = (id) => router.push('/post/' + id)
-
-const handleCreatePost = () => {
-  if (!user.value) { showAuth.value = true; return }
-}
 
 const handleDeletePost = async (postId) => {
   if (!confirm('确定要删除这篇帖子吗？删除后无法恢复。')) return
@@ -67,31 +63,25 @@ const handleDeletePost = async (postId) => {
 </script>
 
 <style scoped>
-.home-layout { display: flex; min-height: calc(100vh - 96px); }
-.main-content {
-  flex: 1; padding: 30px 40px; max-width: 1200px;
-  transition: margin-right 0.3s;
-}
-.content-header {
+.home-layout {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  height: calc(100vh - 96px);
+  overflow: hidden;
+  gap: 0;
 }
-.content-header h1 { font-size: 1.5rem; color: var(--text-color); }
 
-.post-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 20px;
-  border: none;
-  border-radius: 20px;
-  background: var(--primary-color);
-  color: white;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: var(--transition);
+.main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 30px 40px;
+  overflow-y: auto;
+
+  /* 隐藏滚动条 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.post-btn:hover { background: var(--secondary-color); }
+
+.main-content::-webkit-scrollbar {
+  display: none;
+}
 </style>
